@@ -16,47 +16,6 @@ The goal is not to ship another chat wrapper. The goal is to make DeepSeek feel 
 
 ---
 
-<p align="center">
-  <img src="src/asset/img/code.gif" alt="Code mode demo" width="49%" style="max-width: 100%;">
-  <img src="src/asset/img/write.gif" alt="Write mode demo" width="49%" style="max-width: 100%;">
-</p>
-
-## What We Built
-
-- A desktop app around the DeepSeek TUI local runtime, with default runtime auto-start and management.
-- A full chat workbench with multiple sessions, streaming output, history, interruption, and resend flows.
-- Local workspace integration so the agent can read, edit, and create files in real projects.
-- Change review surfaces that make every file modification visible and inspectable.
-- First-run onboarding, settings, language/theme/font controls, notifications, local logs, and update entry points.
-- Graphical Skill and MCP management so users can extend the agent without hand-editing every config file.
-- Claw background automation with Feishu / Lark integration, dedicated IM agents, local webhook / relay support, and scheduled tasks.
-- A dedicated Write workbench with writing spaces, a Markdown file tree, live editing/preview, inline completion, and selection-based inline agent actions.
-- Pre-built macOS and Windows installers; Linux/Unix users can build from source.
-
-## Highlights
-
-- **Desktop chat workbench**: multi-session chat with streamed replies, reasoning, tool calls, approval requests, and file changes in one place.
-- **Project workspaces**: choose a local directory for each task, organize sessions by workspace, preview files, open files in your editor, and pick Git branches.
-- **Change review**: inline diffs and a side review panel help you understand exactly what the agent changed.
-- **Controlled permissions**: choose read-only, workspace-write, full-access, or external sandbox modes, and decide when tool calls require approval.
-- **Managed runtime**: use the bundled DeepSeek TUI by default, or point the app at your own `deepseek` executable.
-- **Skill and MCP support**: create Skills, edit MCP config, add common tools, and open the related folders from the UI.
-- **Claw background automation**: run a background agent alongside normal chat, with current support for Feishu / Lark, IM webhook / relay flows, and scheduled tasks.
-- **Write mode**: manage `~/.deepseekdesktop/write_workspace` and custom writing spaces, browse Markdown files, use live Markdown editing, preview relative images, get DeepSeek FIM short completion / inspiration completion with optional cross-document BM25 + keyword retrieval, export the current document as `HTML / PDF / DOC / DOCX`, and invoke the writing assistant directly from selected text.
-- **Friendly first launch**: add your DeepSeek API key, and optionally set a compatible Base URL.
-- **Local-first**: preferences, sessions, logs, and runtime config stay on your machine; model calls use your own DeepSeek API key.
-- **English UI**: interface language is English.
-- **Cross-platform use**: macOS `.dmg/.zip` and Windows `.exe`; Linux/Unix users can build from source.
-
-## Who It Is For
-
-- Developers who want DeepSeek to work on real codebases without living in a terminal.
-- Teams that need to see what the agent did, which files changed, and which operations required approval.
-- Users who maintain multiple projects or long-running conversations and want reusable Skill/MCP setup.
-- Anyone who wants a local desktop workbench connected to the official DeepSeek API or a compatible endpoint.
-
----
-
 ## Three Workbench Modes
 
 DeepSeek Desktop exposes three modes in the top-left sidebar: **Code**, **Write**, and **Claw**. They share the same DeepSeek runtime and settings, but keep sessions, workspaces, and layouts separate so you can switch by task.
@@ -66,7 +25,7 @@ DeepSeek Desktop exposes three modes in the top-left sidebar: **Code**, **Write*
 The development workbench for real codebases: bind a local project directory, read and edit files, run commands, and review changes.
 
 <p align="center">
-  <img src="src/asset/img/codemode.png" alt="DeepSeek Desktop Code mode" width="860">
+  <img src="src/asset/img/codemode.jpg" alt="DeepSeek Desktop Code mode" width="860">
 </p>
 
 - Organize multiple agent sessions by workspace, with streamed reasoning, tool calls, and file changes in one view.
@@ -78,7 +37,7 @@ The development workbench for real codebases: bind a local project directory, re
 A dedicated Markdown writing workbench that keeps writing files, save state, and AI assistance separate from Code sessions.
 
 <p align="center">
-  <img src="src/asset/img/writemode.png" alt="DeepSeek Desktop Write mode" width="860">
+  <img src="src/asset/img/writemode.jpg" alt="DeepSeek Desktop Write mode" width="860">
 </p>
 
 - Manage `~/.deepseekdesktop/write_workspace` plus custom writing spaces from the left file tree.
@@ -89,10 +48,6 @@ A dedicated Markdown writing workbench that keeps writing files, save state, and
 ### Claw Mode
 
 Background automation and IM integration, so agents can keep handling messages and scheduled jobs outside normal chat.
-
-<p align="center">
-  <img src="src/asset/img/clawmode.png" alt="DeepSeek Desktop Claw mode" width="860">
-</p>
 
 - Configure dedicated agents for Feishu / Lark and other channels, each with its own profile, default model, and workspace.
 - Every IM agent gets its own thread, so you can debug replies and tool calls directly in the GUI.
@@ -144,8 +99,6 @@ npm install --registry=https://registry.npmmirror.com
 
 1. Open DeepSeek Desktop.
 2. Enter your DeepSeek API key; set a custom Base URL if needed.
-3. Choose a default workspace, or use the default directory created by the app.
-4. Start a new session and describe the task you want the agent to handle.
 
 Typical flow (**Code mode**):
 
@@ -168,7 +121,7 @@ Settings manages:
 - Auto-start for the local runtime, plus optional custom `deepseek` path.
 - Tool approval policy and filesystem access mode.
 - Default workspace, theme, font size, and completion notifications.
-- GUI updates, DeepSeek TUI updates, and local error logs.
+- DeepSeek TUI updates, and local error logs.
 - Skill creation, Skill folders, and MCP config editing.
 - Claw background automation, Feishu / Lark connections, webhook / relay settings, and scheduled tasks.
 
@@ -234,7 +187,6 @@ DeepSeek TUI shared config usually lives in `~/.deepseek`. Check it before delet
 
 ## Updates
 
-- For regular users: macOS/Windows can check GUI updates in Settings or download the latest installer from [GitHub Releases](https://github.com/coredds/DeepSeek-Desktop/releases); Linux/Unix users should build from source.
 - For the DeepSeek TUI runtime: when the GUI manages the runtime, Settings can check and upgrade the bundled TUI.
 
 ## Contributing
