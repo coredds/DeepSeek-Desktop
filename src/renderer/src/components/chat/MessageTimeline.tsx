@@ -305,7 +305,15 @@ export function MessageTimeline({
   return (
     <div ref={containerRef} className="ds-no-drag flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
       <div className="ds-chat-column-inset mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-8 pb-10 pt-8">
-        {!activeThreadId && (
+        {!activeThreadId && heroRoute === 'chat-pure' ? (
+          <ChatEmptyHero
+            ready={runtimeConnection === 'ready'}
+            onSelectSuggestion={onSelectSuggestion}
+            onRetry={onRetryConnection}
+            onOpenSettings={onOpenSettings}
+            onOpenDiagnostics={onOpenDiagnostics}
+          />
+        ) : !activeThreadId ? (
           <EmptyHero
             route={heroRoute}
             ready={runtimeConnection === 'ready'}
@@ -317,9 +325,17 @@ export function MessageTimeline({
             onOpenDiagnostics={onOpenDiagnostics}
             onSelectSuggestion={onSelectSuggestion}
           />
-        )}
+        ) : null}
 
-        {activeThreadId && !hasContent && (
+        {activeThreadId && !hasContent && heroRoute === 'chat-pure' ? (
+          <ChatEmptyHero
+            ready={runtimeConnection === 'ready'}
+            onSelectSuggestion={onSelectSuggestion}
+            onRetry={onRetryConnection}
+            onOpenSettings={onOpenSettings}
+            onOpenDiagnostics={onOpenDiagnostics}
+          />
+        ) : activeThreadId && !hasContent ? (
           <EmptyHero
             route={heroRoute}
             ready={runtimeConnection === 'ready'}
@@ -331,7 +347,7 @@ export function MessageTimeline({
             onOpenDiagnostics={onOpenDiagnostics}
             onSelectSuggestion={onSelectSuggestion}
           />
-        )}
+        ) : null}
 
         {activeThread?.forkedFromThreadId ? (
           <ThreadForkBanner parentTitle={forkedFromTitle} />
@@ -585,6 +601,134 @@ function EmptyHero({
       </p>
 
       <div className="ds-empty-hero-grid mt-12 grid w-full max-w-[980px] gap-5">
+        {suggestions.map((s) => (
+          <button
+            key={s.titleKey}
+            type="button"
+            onClick={() => onSelectSuggestion?.(t(s.promptKey))}
+            className="ds-empty-hero-card group flex min-h-[118px] items-center gap-4 rounded-[24px] border border-[rgba(15,23,42,0.1)] bg-[rgba(255,255,255,0.92)] px-6 py-5 text-left shadow-[0_18px_48px_rgba(86,103,136,0.08)] transition duration-200 hover:-translate-y-0.5 hover:border-[rgba(0,136,255,0.18)] hover:shadow-[0_24px_56px_rgba(86,103,136,0.14)] dark:border-white/10 dark:bg-[rgba(24,24,24,0.9)] dark:shadow-[0_20px_52px_rgba(0,0,0,0.24)]"
+          >
+            <span
+              className={`ds-empty-hero-card-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] ${SUGGESTION_TONE[s.tone]}`}
+            >
+              {s.icon}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="ds-empty-hero-card-title block truncate text-[18px] font-semibold tracking-[-0.02em] text-ds-ink">
+                {t(s.titleKey)}
+              </span>
+              <span className="ds-empty-hero-card-sub mt-1 block text-[15px] leading-6 text-ds-faint">
+                {t(s.subKey)}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ChatEmptyHero({
+  ready,
+  onSelectSuggestion,
+  onRetry,
+  onOpenSettings,
+  onOpenDiagnostics
+}: {
+  ready: boolean
+  onSelectSuggestion?: (prompt: string) => void
+  onRetry: () => void
+  onOpenSettings: () => void
+  onOpenDiagnostics: () => void
+}): ReactElement {
+  const { t } = useTranslation('common')
+
+  if (!ready) {
+    return (
+      <div className="flex flex-col items-center justify-center px-8 py-20 text-center">
+        <div className="ds-card-soft mb-5 rounded-[20px] px-5 py-4">
+          <Bot className="mx-auto h-7 w-7 text-accent opacity-90" strokeWidth={1.4} />
+        </div>
+        <p className="max-w-sm text-[24px] font-semibold tracking-[-0.03em] text-ds-ink">
+          {t('runtimeOfflineHeroTitle')}
+        </p>
+        <p className="mt-3 max-w-[560px] text-[15.5px] leading-7 text-ds-muted">
+          {t('runtimeOfflineHeroSub')}
+        </p>
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            className="ds-chip rounded-full px-5 py-2.5 text-[13px] font-medium text-ds-ink transition hover:text-ds-ink"
+            onClick={onRetry}
+          >
+            {t('retryConnection')}
+          </button>
+          <button
+            type="button"
+            className="ds-chip-muted rounded-full px-5 py-2.5 text-[13px] font-medium text-ds-muted transition hover:text-ds-ink"
+            onClick={onOpenDiagnostics}
+          >
+            {t('runtimeDiagnosticsButton')}
+          </button>
+          <button
+            type="button"
+            className="ds-chip-muted rounded-full px-5 py-2.5 text-[13px] font-medium text-ds-muted transition hover:text-ds-ink"
+            onClick={onOpenSettings}
+          >
+            {t('openSettings')}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const suggestions: Array<{
+    icon: ReactElement
+    tone: SuggestionTone
+    titleKey: string
+    subKey: string
+    promptKey: string
+  }> = [
+    {
+      icon: <Lightbulb className="h-4 w-4" strokeWidth={1.8} />,
+      tone: 'violet',
+      titleKey: 'chatPromptExplainTitle',
+      subKey: 'chatPromptExplainSub',
+      promptKey: 'chatPromptExplainPrompt'
+    },
+    {
+      icon: <PencilLine className="h-4 w-4" strokeWidth={1.8} />,
+      tone: 'blue',
+      titleKey: 'chatPromptWriteTitle',
+      subKey: 'chatPromptWriteSub',
+      promptKey: 'chatPromptWritePrompt'
+    },
+    {
+      icon: <Terminal className="h-4 w-4" strokeWidth={1.8} />,
+      tone: 'emerald',
+      titleKey: 'chatPromptCodeTitle',
+      subKey: 'chatPromptCodeSub',
+      promptKey: 'chatPromptCodePrompt'
+    },
+    {
+      icon: <Palette className="h-4 w-4" strokeWidth={1.8} />,
+      tone: 'orange',
+      titleKey: 'chatPromptBrainstormTitle',
+      subKey: 'chatPromptBrainstormSub',
+      promptKey: 'chatPromptBrainstormPrompt'
+    }
+  ]
+
+  return (
+    <div className="ds-empty-hero ds-no-drag flex flex-col items-center justify-center px-4 pb-4 pt-16 text-center">
+      <h1 className="ds-empty-hero-title text-[44px] font-semibold tracking-[-0.05em] text-ds-ink">
+        {t('chatEmptyHeroTitle')}
+      </h1>
+      <p className="ds-empty-hero-sub mt-4 text-[18px] leading-8 text-ds-muted">
+        {t('chatEmptyHeroSub')}
+      </p>
+
+      <div className="ds-empty-hero-grid mt-14 grid w-full max-w-[980px] gap-5">
         {suggestions.map((s) => (
           <button
             key={s.titleKey}

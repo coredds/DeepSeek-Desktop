@@ -26,53 +26,70 @@ export function WorkspaceModeTabs({
         : 'text-ds-faint hover:bg-white/45 hover:text-ds-muted dark:hover:bg-white/[0.07]'
     }`
 
+  const chatActive = activeView === 'chat-pure'
+
   return (
-    <div
-      role="tablist"
-      aria-label={`${t('chat')} / ${t('code')} / ${t('write')} / ${t('claw')}`}
-      className="mb-4 rounded-[12px] border border-ds-border-muted/45 bg-ds-subtle/72 p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.52)] backdrop-blur dark:bg-white/[0.045] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
-    >
-      <div className="grid h-[34px] grid-cols-4 gap-0.5">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeView === 'chat-pure'}
-          onClick={onPureChatOpen}
-          className={tabClass(activeView === 'chat-pure')}
-        >
-          <MessageSquare className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
-          <span className="truncate">{t('chat')}</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeView === 'chat'}
-          onClick={onCodeOpen}
-          className={tabClass(activeView === 'chat')}
-        >
-          <Code2 className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
-          <span className="truncate">{t('code')}</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeView === 'write'}
-          onClick={onWriteOpen}
-          className={tabClass(activeView === 'write')}
-        >
-          <PencilLine className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
-          <span className="truncate">{t('write')}</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeView === 'claw'}
-          onClick={onClawOpen}
-          className={tabClass(activeView === 'claw')}
-        >
-          <Bot className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
-          <span className="truncate">{t('claw')}</span>
-        </button>
+    <div className="mb-4 flex flex-col gap-3">
+      <button
+        type="button"
+        onClick={onPureChatOpen}
+        className={`flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-[14px] font-medium transition ${
+          chatActive
+            ? 'bg-accent/10 text-accent shadow-sm ring-1 ring-accent/15'
+            : 'text-ds-ink hover:bg-ds-hover/45'
+        }`}
+      >
+        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] ${
+          chatActive ? 'bg-accent/15 text-accent' : 'bg-ds-hover/70 text-ds-muted'
+        }`}>
+          <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.9} />
+        </span>
+        <span className="flex-1 truncate text-left">{t('chat')}</span>
+      </button>
+
+      <div className="flex items-center gap-1.5">
+        <span className="h-px flex-1 bg-ds-border-muted/40" />
+        <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-ds-faint">{t('workspaceModesLabel')}</span>
+        <span className="h-px flex-1 bg-ds-border-muted/40" />
+      </div>
+
+      <div
+        role="tablist"
+        aria-label={`${t('code')} / ${t('write')} / ${t('claw')}`}
+        className="rounded-[12px] border border-ds-border-muted/45 bg-ds-subtle/72 p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.52)] backdrop-blur dark:bg-white/[0.045] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+      >
+        <div className="grid h-[34px] grid-cols-3 gap-0.5">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeView === 'chat'}
+            onClick={onCodeOpen}
+            className={tabClass(activeView === 'chat')}
+          >
+            <Code2 className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
+            <span className="truncate">{t('code')}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeView === 'write'}
+            onClick={onWriteOpen}
+            className={tabClass(activeView === 'write')}
+          >
+            <PencilLine className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
+            <span className="truncate">{t('write')}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeView === 'claw'}
+            onClick={onClawOpen}
+            className={tabClass(activeView === 'claw')}
+          >
+            <Bot className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
+            <span className="truncate">{t('claw')}</span>
+          </button>
+        </div>
       </div>
     </div>
   )
