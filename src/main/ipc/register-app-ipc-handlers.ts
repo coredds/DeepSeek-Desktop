@@ -112,6 +112,7 @@ type RegisterAppIpcHandlersOptions = {
   getAppVersion: () => string
   resolveLogDirectory: () => string
   logError: (category: string, message: string, detail?: unknown) => void
+  restartRuntime: () => Promise<void>
 }
 
 function parseIpcPayload<T>(channel: string, schema: z.ZodType<T>, payload: unknown): T {
@@ -307,7 +308,8 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     showTurnCompleteNotification,
     getAppVersion,
     resolveLogDirectory,
-    logError
+    logError,
+    restartRuntime
   } = options
   const workspaceFileWatchers = new Map<string, WorkspaceFileWatchRecord>()
 
@@ -562,6 +564,9 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const path = resolveDeepseekConfigPath()
     await mkdir(dirname(path), { recursive: true })
     await writeFile(path, validatedContent, 'utf8')
+    void restartRuntime().catch((e: unknown) => {
+      logError('mcp-config-restart', 'Runtime restart after MCP config write failed', e)
+    })
     return { ok: true as const, path }
   })
 

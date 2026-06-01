@@ -853,6 +853,29 @@ app.whenReady().then(async () => {
     }
   }
 
+  const restartRuntime = async (): Promise<void> => {
+    const s = await store.load()
+    if (!isDeepseekChildRunning()) return
+    if (!resolveConfiguredApiKey(s) || !s.deepseek.autoStart) return
+
+    await stopDeepseekChildAndWait()
+    const reclaimed = await reclaimDeepseekPort(s.deepseek.port)
+    if (!reclaimed.ok) {
+      console.warn('[deepseek-desktop] MCP config restart skipped:', reclaimed.message)
+      return
+    }
+
+    try {
+      await startDeepseekChild(s)
+      const healthy = await waitForRuntimeHealth(s.deepseek.port, 20_000)
+      if (!healthy) {
+        console.warn('[deepseek-desktop] runtime did not become healthy after MCP config restart')
+      }
+    } catch (e) {
+      console.warn('[deepseek-desktop] runtime restart after MCP config write failed:', e)
+    }
+  }
+
   registerAppIpcHandlers({
     store,
     getMainWindow: () => mainWindow,
@@ -873,7 +896,8 @@ app.whenReady().then(async () => {
     showTurnCompleteNotification,
     getAppVersion: () => app.getVersion(),
     resolveLogDirectory,
-    logError
+    logError,
+    restartRuntime
   })
 
   ipcMain.handle('deepseek:spawn-if-needed', async () => {
