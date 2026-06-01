@@ -254,6 +254,8 @@ export function WriteAssistantPanel({
           modelPickerMode="combobox"
           queuedMessages={queuedMessages}
           onRemoveQueuedMessage={removeQueuedMessage}
+          attachments={[]}
+          onAttachmentsChange={() => {}}
           onSend={onSend}
           onInterrupt={onInterrupt}
         />

@@ -18,6 +18,7 @@ import {
   MessageSquareQuote,
   Minimize2,
   Palette,
+  Paperclip,
   PencilLine,
   Terminal,
   Wrench
@@ -1986,6 +1987,29 @@ function UserMessageBubble({
         <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-left">
           {displayText}
         </div>
+        {block.attachments && block.attachments.length > 0 ? (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {block.attachments.map((att) => (
+              <div
+                key={att.id}
+                className="overflow-hidden rounded-xl border border-ds-border-muted/60"
+              >
+                {att.mimeType.startsWith('image/') ? (
+                  <img
+                    src={att.dataUrl}
+                    alt={att.name}
+                    className="max-h-48 max-w-[240px] object-cover"
+                  />
+                ) : (
+                  <div className="flex items-center gap-2 px-3 py-2 text-[12.5px] text-ds-muted">
+                    <Paperclip className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
+                    <span className="max-w-[160px] truncate">{att.name}</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : null}
         {parsedWritePrompt ? (
           <WritePromptMetaDisclosure
             display={parsedWritePrompt}

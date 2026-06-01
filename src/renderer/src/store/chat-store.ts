@@ -215,6 +215,8 @@ function notifyTurnComplete(threadId: string | null, state: ChatState, dedupeKey
     })
 }
 
+import { buildPromptWithAttachments } from '../lib/prompt-attachments'
+
 /**
  * Compute the patch that finalizes timing for the current in-progress turn.
  * No-op if there is no current turn or its start time was not recorded.
@@ -1635,6 +1637,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const previousTurnReasoningFirstAtByUserId = get().turnReasoningFirstAtByUserId
     const previousTurnReasoningLastAtByUserId = get().turnReasoningLastAtByUserId
     const previousQueuedMessages = get().queuedMessages
+    const attachments = overrides?.attachments
     resetBusyRecoveryAttempts()
     set((s) => ({
       busy: true,
@@ -1645,7 +1648,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
           id: userBlockId,
           createdAt: new Date(now).toISOString(),
           text: trimmedText,
-          ...(userModelChip ? { modelLabel: userModelChip } : {})
+          ...(userModelChip ? { modelLabel: userModelChip } : {}),
+          ...(attachments && attachments.length > 0 ? { attachments } : {})
         }
       ],
       liveReasoning: '',
@@ -1738,11 +1742,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const seqAtSend = get().lastSeq
       const channel = get().route === 'claw' ? activeClawChannel(get()) : null
+      const baseText = get().route === 'chat-pure'
+        ? trimmedText
+        : wrapWithAppContext(trimmedText)
       const runtimeText = channel
         ? buildClawRuntimePrompt(await window.dsGui.getSettings(), trimmedText, { channel })
-        : get().route === 'chat-pure'
-          ? trimmedText
-          : wrapWithAppContext(trimmedText)
+        : buildPromptWithAttachments(baseText, attachments)
       const { turnId, userMessageItemId } = await p.sendUserMessage(activeThreadId, runtimeText, {
         mode,
         ...(composerModel ? { model: composerModel } : {})

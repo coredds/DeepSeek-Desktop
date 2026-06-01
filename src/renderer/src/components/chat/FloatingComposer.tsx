@@ -9,6 +9,7 @@ import {
   Gauge,
   ListTodo,
   Minimize2,
+  Paperclip,
   RotateCcw,
   Send,
   Square,
@@ -24,6 +25,7 @@ import {
   useThreadUsageState
 } from '../../hooks/use-thread-usage'
 import { GitBranchPicker } from './GitBranchPicker'
+import type { AttachmentItem } from '../../agent/types'
 
 type QueuedComposerMessage = {
   id: string
@@ -47,6 +49,8 @@ type Props = {
   modelPickerMode?: 'select' | 'combobox'
   queuedMessages: QueuedComposerMessage[]
   onRemoveQueuedMessage: (id: string) => void
+  attachments: AttachmentItem[]
+  onAttachmentsChange: (attachments: AttachmentItem[]) => void
   onSend: () => void
   onInterrupt: () => void
   onOpenRuntimePanel?: () => void
@@ -87,6 +91,8 @@ export function FloatingComposer({
   modelPickerMode = 'select',
   queuedMessages,
   onRemoveQueuedMessage,
+  attachments,
+  onAttachmentsChange,
   onSend,
   onInterrupt,
   onOpenRuntimePanel
@@ -103,8 +109,12 @@ export function FloatingComposer({
   const activeClawChannelId = useChatStore((s) => s.activeClawChannelId)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const composingRef = useRef(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const attachmentsRef = useRef(attachments)
+  attachmentsRef.current = attachments
   const [focused, setFocused] = useState(false)
   const [modelMenuOpen, setModelMenuOpen] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
   const compact = variant === 'compact'
   const modelPickerRef = useRef<HTMLElement | null>(null)
   const activeClawChannel = useMemo(
@@ -405,6 +415,99 @@ export function FloatingComposer({
     }
   }
 
+  const readFilesAsAttachments = useCallback(
+    (files: FileList | File[]): void => {
+      const fileArray = Array.from(files)
+      const newAttachments: AttachmentItem[] = []
+      let remaining = fileArray.length
+      for (const file of fileArray) {
+        const reader = new FileReader()
+        reader.onload = () => {
+          newAttachments.push({
+            id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: file.name,
+            mimeType: file.type || 'application/octet-stream',
+            dataUrl: typeof reader.result === 'string' ? reader.result : '',
+            size: file.size
+          })
+          remaining -= 1
+          if (remaining === 0) {
+            onAttachmentsChange([...attachmentsRef.current, ...newAttachments])
+          }
+        }
+        reader.readAsDataURL(file)
+      }
+    },
+    [onAttachmentsChange]
+  )
+
+  const removeAttachment = useCallback(
+    (id: string): void => {
+      onAttachmentsChange(attachments.filter((a) => a.id !== id))
+    },
+    [attachments, onAttachmentsChange]
+  )
+
+  const handleFilePicker = useCallback((): void => {
+    fileInputRef.current?.click()
+  }, [])
+
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>): void => {
+      if (e.target.files && e.target.files.length > 0) {
+        readFilesAsAttachments(e.target.files)
+        e.target.value = ''
+      }
+    },
+    [readFilesAsAttachments]
+  )
+
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>): void => {
+      const items = e.clipboardData?.items
+      if (!items) return
+      const imageFiles: File[] = []
+      for (let i = 0; i < items.length; i += 1) {
+        const item = items[i]
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          const file = item.getAsFile()
+          if (file) imageFiles.push(file)
+        }
+      }
+      if (imageFiles.length > 0) {
+        e.preventDefault()
+        readFilesAsAttachments(imageFiles)
+      }
+    },
+    [readFilesAsAttachments]
+  )
+
+  const handleDragOver = useCallback((e: React.DragEvent): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer.types.some((t) => t === 'Files')) {
+      setDragOver(true)
+    }
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+  }, [])
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent): void => {
+      e.preventDefault()
+      e.stopPropagation()
+      setDragOver(false)
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        readFilesAsAttachments(e.dataTransfer.files)
+      }
+    },
+    [readFilesAsAttachments]
+  )
+
   const handlePrimaryAction = (): void => {
     if (highlightedSlashCommand) {
       if (highlightedSlashCommand.disabled) return
@@ -419,6 +522,15 @@ export function FloatingComposer({
       ? 'ds-floating-composer pointer-events-auto w-full pb-0 pt-0'
       : 'ds-floating-composer ds-chat-column-inset pointer-events-auto w-full max-w-4xl pb-5 pt-1'}
     >
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept="image/*,.pdf,.txt,.csv,.json,.md,.log,.xml,.yaml,.yml,.toml,.ini,.cfg"
+        onChange={handleFileChange}
+        className="hidden"
+        aria-hidden
+      />
       {queuedMessages.length > 0 ? (
         <div className="mb-2 rounded-[22px] border border-ds-border bg-ds-card/88 px-4 py-3 shadow-sm backdrop-blur-xl">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -511,11 +623,54 @@ export function FloatingComposer({
           </div>
         ) : null}
 
+        {attachments.length > 0 ? (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {attachments.map((att) => (
+              <div
+                key={att.id}
+                className="group relative flex items-center gap-2 rounded-xl border border-ds-border-muted bg-ds-card/88 px-3 py-2 text-[13px] shadow-sm backdrop-blur"
+              >
+                {att.mimeType.startsWith('image/') ? (
+                  <img
+                    src={att.dataUrl}
+                    alt={att.name}
+                    className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                  />
+                ) : (
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-ds-card-muted text-ds-faint">
+                    <Paperclip className="h-4 w-4" strokeWidth={1.8} />
+                  </span>
+                )}
+                <span className="max-w-[160px] truncate text-ds-ink">{att.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(att.id)}
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ds-hover/80 text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink"
+                  aria-label={t('removeAttachment')}
+                  title={t('removeAttachment')}
+                >
+                  <X className="h-3 w-3" strokeWidth={2} />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         <div
-          className={`ds-composer-shell ds-chat-composer ds-frosted flex flex-col gap-2 px-4 py-2.5 transition ${
+          className={`ds-composer-shell ds-chat-composer ds-frosted relative flex flex-col gap-2 px-4 py-2.5 transition ${
             focused ? 'ds-chat-composer-focus' : ''
-          } ${compact ? 'rounded-[24px] px-3 py-2 shadow-none' : ''}`}
+          } ${compact ? 'rounded-[24px] px-3 py-2 shadow-none' : ''} ${
+            dragOver ? 'ring-2 ring-accent/30' : ''
+          }`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
         >
+          {dragOver ? (
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[24px] bg-accent/8 backdrop-blur-sm">
+              <span className="text-[14px] font-semibold text-accent">{t('dropFilesHere')}</span>
+            </div>
+          ) : null}
           {mode === 'plan' ? (
             <div className="flex items-center gap-2 px-1 pt-1">
               <button
@@ -542,6 +697,7 @@ export function FloatingComposer({
               value={input}
               disabled={!canCompose}
               onChange={(e) => setInput(e.target.value)}
+              onPaste={handlePaste}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               onCompositionStart={() => {
@@ -690,7 +846,18 @@ export function FloatingComposer({
               >
                 <Square className="h-3.5 w-3.5" strokeWidth={2.4} />
               </button>
-            ) : null}
+            ) : (
+              <button
+                type="button"
+                onClick={handleFilePicker}
+                disabled={!canCompose}
+                className="ds-no-drag flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-ds-border-muted bg-ds-card/80 text-ds-muted shadow-sm transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label={t('attachFiles')}
+                title={t('attachFiles')}
+              >
+                <Paperclip className="h-4 w-4" strokeWidth={1.9} />
+              </button>
+            )}
 
             <button
               type="button"

@@ -6,7 +6,7 @@ import { useShallow } from 'zustand/react/shallow'
 import type { WorkspaceFileTarget } from '@shared/workspace-file'
 import { parseClawCommand } from '@shared/claw-commands'
 import { DEFAULT_COMPOSER_MODEL_IDS } from '@shared/default-composer-models'
-import type { ChatBlock } from '../agent/types'
+import type { AttachmentItem, ChatBlock } from '../agent/types'
 import { CLAW_COMPOSER_MODEL_IDS, useChatStore } from '../store/chat-store'
 import {
   extractLatestTurnAutoOpenDevPreviewUrls,
@@ -320,6 +320,7 @@ export function Workbench(): ReactElement {
   )
   const [input, setInput] = useState('')
   const [mode, setMode] = useState<'plan' | 'agent'>('agent')
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([])
   const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>(readStoredRightPanelMode)
   const [filePreviewTarget, setFilePreviewTarget] = useState<WorkspaceFileTarget | null>(null)
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(() =>
@@ -505,12 +506,14 @@ export function Workbench(): ReactElement {
     prevThreadId.current = activeThreadId
     if (prev != null && prev !== activeThreadId) {
       draftByThread.current[prev] = inputRef.current
+      setAttachments([])
     }
     if (activeThreadId != null && activeThreadId !== prev) {
       setInput(draftByThread.current[activeThreadId] ?? '')
     }
     if (activeThreadId == null) {
       setInput('')
+      setAttachments([])
     }
   }, [activeThreadId])
 
@@ -714,7 +717,9 @@ export function Workbench(): ReactElement {
       return
     }
     setInput('')
-    void sendMessage(v, mode === 'plan' ? 'plan' : 'agent')
+    const currentAttachments = [...attachments]
+    setAttachments([])
+    void sendMessage(v, mode === 'plan' ? 'plan' : 'agent', currentAttachments.length > 0 ? { attachments: currentAttachments } : undefined)
   }
 
   const openThread = (id: string): void => {
@@ -1188,6 +1193,8 @@ export function Workbench(): ReactElement {
                   }
                   setComposerModel(modelId)
                 }}
+                attachments={attachments}
+                onAttachmentsChange={setAttachments}
                 onSend={handleSend}
                 queuedMessages={queuedMessages}
                 onRemoveQueuedMessage={removeQueuedMessage}

@@ -76,8 +76,16 @@ export type CompactionBlock = {
   messagesAfter?: number
 }
 
+export type AttachmentItem = {
+  id: string
+  name: string
+  mimeType: string
+  dataUrl: string
+  size: number
+}
+
 export type ChatBlock =
-  | { kind: 'user'; id: string; createdAt?: string; text: string; modelLabel?: string }
+  | { kind: 'user'; id: string; createdAt?: string; text: string; modelLabel?: string; attachments?: AttachmentItem[] }
   | { kind: 'assistant'; id: string; createdAt?: string; text: string }
   | { kind: 'reasoning'; id: string; createdAt?: string; text: string }
   | ToolBlock

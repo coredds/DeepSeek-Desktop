@@ -1,5 +1,6 @@
 import type {
   AgentProviderId,
+  AttachmentItem,
   ChatBlock,
   NormalizedThread,
   RuntimeConnectionStatus,
@@ -26,6 +27,7 @@ export type SendMessageOverrides = {
   queued?: QueuedUserMessage
   model?: string
   modelLabel?: string
+  attachments?: AttachmentItem[]
 }
 
 export type InitialSetupMode = 'required' | 'preview'
