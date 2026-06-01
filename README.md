@@ -17,9 +17,18 @@ The goal is not to ship another chat wrapper. The goal is to make DeepSeek feel 
 
 ---
 
-## Three Workbench Modes
+## Four Workbench Modes
 
-DeepSeek Desktop exposes three modes in the top-left sidebar: **Code**, **Write**, and **Claw**. They share the same DeepSeek runtime and settings, but keep sessions, workspaces, and layouts separate so you can switch by task.
+DeepSeek Desktop exposes four modes in the top-left sidebar: **Chat**, **Code**, **Write**, and **Claw**. Chat is the default — a clean, workspace-free assistant for general questions, brainstorming, and quick help. Code, Write, and Claw share the same DeepSeek runtime and settings, but keep sessions, workspaces, and layouts separate.
+
+### Chat Mode
+
+The default landing experience: a straightforward chat interface that doesn't require a workspace. Paste images, drag files, or use the paperclip button to attach context.
+
+- No workspace required — just type and send. Threads stay in your history like any other conversation.
+- Drag and drop images or files onto the composer, paste images from the clipboard, or use the paperclip button to attach files. Images are inlined for multimodal models; other files are referenced in the prompt.
+- Quick-start cards for explaining topics, writing, coding help, and brainstorming.
+- Plan mode: toggle `/plan` in the composer to sketch steps before executing.
 
 ### Code Mode
 
@@ -105,6 +114,11 @@ npm install --registry=https://registry.npmmirror.com
 
 The setup dialog shows progress as the DeepSeek runtime starts, so you can see when it's ready.
 
+Typical flow (**Chat mode**):
+
+- Type your question or drag in an image — no workspace needed.
+- Use the suggestion cards or type `/` for slash commands (plan mode, compact, fork, archive).
+
 Typical flow (**Code mode**):
 
 - Pick or switch a workspace from the sidebar.
@@ -113,7 +127,7 @@ Typical flow (**Code mode**):
 - Allow or deny actions that require approval.
 - Inspect changes in the review panel before deciding what to do next.
 
-See [Three Workbench Modes](#three-workbench-modes) above for Claw and Write details. Quick start:
+See [Four Workbench Modes](#four-workbench-modes) above for Chat, Claw and Write details. Quick start:
 
 - **Claw**: enable background automation in Settings → add a Feishu / Lark connection → configure agent profile, model, and workspace → optionally enable webhook / relay or scheduled tasks.
 - **Write**: switch to Write mode → use the default writing space or add a new one → write in the Live editor with completion, selection inline agent, and the right-side writing assistant.
@@ -134,10 +148,7 @@ Keyboard shortcuts:
 
 | Key | Action |
 | --- | --- |
-| `Ctrl+N` / `⌘N` | New agent thread |
-| `Ctrl+1` / `⌘1` | Switch to Code mode |
-| `Ctrl+2` / `⌘2` | Switch to Write mode |
-| `Ctrl+3` / `⌘3` | Switch to Claw mode |
+| `Ctrl+N` / `⌘N` | New thread (respects active mode) |
 | `Ctrl+B` / `⌘B` | Toggle sidebar |
 | `Ctrl+J` / `⌘J` | Toggle terminal |
 | `Ctrl+\` / `⌘\` | Toggle right panel |
@@ -246,7 +257,7 @@ For the underlying runtime, see [DeepSeek TUI](https://github.com/Hmbown/DeepSee
 
 ## Acknowledgments
 
-> Bring the local DeepSeek TUI agent into a desktop workbench: **Code** for development, **Write** for documents, **Claw** for IM automation — chat, change review, Skill/MCP management, and updates in one graphical app.
+> Bring the local DeepSeek TUI agent into a desktop workbench: **Chat** for general questions, **Code** for development, **Write** for documents, **Claw** for IM automation — chat, file attachments, change review, Skill/MCP management, and updates in one graphical app.
 
 - **[DeepSeek GUI](https://github.com/XingYu-Zhong/DeepSeek-GUI)** by XingYu-Zhong and contributors — this project is forked from their excellent work. Licensed under MIT.
 - [DeepSeek TUI](https://github.com/Hmbown/DeepSeek-TUI): the local agent runtime behind the app.
