@@ -6,6 +6,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { Terminal as XTerm, type ITheme } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { workspaceLabelFromPath } from '../lib/workspace-label'
+import { TerminalCommandPalette } from './TerminalCommandPalette'
 
 type SessionState = {
   id: string
@@ -70,6 +71,7 @@ export function AppTerminalPanel({
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [creatingSession, setCreatingSession] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const sessionNodeRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const terminalHandlesRef = useRef<Map<string, TerminalHandle>>(new Map())
@@ -252,6 +254,29 @@ export function AppTerminalPanel({
     })
   }
 
+  const handleRunCommand = useCallback((command: string) => {
+    const id = activeSessionId
+    if (!id) return
+    const terminalHandle = terminalHandlesRef.current.get(id)
+    if (!terminalHandle) return
+    if (command) {
+      void window.dsGui?.writeTerminalSession?.({ sessionId: id, data: command + '\r' })
+    } else {
+      void window.dsGui?.writeTerminalSession?.({ sessionId: id, data: '\x03' })
+    }
+  }, [activeSessionId])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'P' && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey) {
+        e.preventDefault()
+        setPaletteOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   return (
     <section className={`ds-no-drag ds-terminal-panel flex min-h-0 flex-col overflow-hidden ${className ?? ''}`}>
       <div className="ds-terminal-panel__tabs flex shrink-0 items-center justify-between gap-2 border-b border-ds-border-muted px-2.5 py-1.5">
@@ -349,6 +374,13 @@ export function AppTerminalPanel({
           ))
         )}
       </div>
+      {paletteOpen ? (
+        <TerminalCommandPalette
+          open={paletteOpen}
+          onClose={() => setPaletteOpen(false)}
+          onRun={handleRunCommand}
+        />
+      ) : null}
     </section>
   )
 }

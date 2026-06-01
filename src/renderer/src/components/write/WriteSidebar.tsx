@@ -24,6 +24,7 @@ import {
 } from '../../write/write-workspace-store'
 import { WorkspaceModeTabs } from '../chat/WorkspaceModeTabs'
 import { WriteFileTree } from './WriteFileTree'
+import { WriteTemplatePicker, type WriteTemplate } from './WriteTemplatePicker'
 
 type Props = {
   activeView: 'chat' | 'write' | 'claw'
@@ -53,6 +54,7 @@ export function WriteSidebar({
   const runtimeConnection = useChatStore((s) => s.runtimeConnection)
   const [appVersion, setAppVersion] = useState('')
   const [entryDialog, setEntryDialog] = useState<EntryDialog | null>(null)
+  const [selectedTemplate, setSelectedTemplate] = useState<WriteTemplate | null>(null)
   const [collapsedWorkspaces, setCollapsedWorkspaces] = useState<Record<string, boolean>>({})
   const {
     defaultWorkspaceRoot,
@@ -177,10 +179,14 @@ export function WriteSidebar({
       entryDialog.kind === 'create-file' ? 'file' : 'folder',
       entryDialog.parentDirectory
     )
+    const targetPath = writeJoinPath(parent, value)
     const created = entryDialog.kind === 'create-file'
-      ? await createFile(workspaceRoot, writeJoinPath(parent, value))
-      : await createDirectory(workspaceRoot, writeJoinPath(parent, value))
-    if (created) setEntryDialog(null)
+      ? await createFile(workspaceRoot, targetPath, selectedTemplate?.content)
+      : await createDirectory(workspaceRoot, targetPath)
+    if (created) {
+      setEntryDialog(null)
+      setSelectedTemplate(null)
+    }
   }
 
   const pickWriteWorkspace = async (): Promise<void> => {
@@ -435,7 +441,7 @@ export function WriteSidebar({
     {entryDialog ? (
       <WriteEntryDialog
         dialog={entryDialog}
-        onClose={() => setEntryDialog(null)}
+        onClose={() => { setEntryDialog(null); setSelectedTemplate(null) }}
         onValueChange={(value) =>
           setEntryDialog((current) => {
             if (!current || current.kind === 'delete') return current
@@ -444,6 +450,17 @@ export function WriteSidebar({
         }
         onSubmit={(event) => void submitEntryDialog(event)}
         t={t}
+        workspaceRoot={workspaceRoot}
+        selectedTemplate={selectedTemplate}
+        onSelectTemplate={(tmpl) => {
+          setSelectedTemplate(tmpl)
+          if (tmpl.filename) {
+            setEntryDialog((current) => {
+              if (!current || current.kind === 'delete') return current
+              return { ...current, value: tmpl.filename }
+            })
+          }
+        }}
       />
     ) : null}
     </>
@@ -479,15 +496,22 @@ function WriteEntryDialog({
   onClose,
   onValueChange,
   onSubmit,
-  t
+  t,
+  workspaceRoot,
+  selectedTemplate,
+  onSelectTemplate
 }: {
   dialog: EntryDialog
   onClose: () => void
   onValueChange: (value: string) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   t: Translate
+  workspaceRoot: string
+  selectedTemplate: WriteTemplate | null
+  onSelectTemplate: (tmpl: WriteTemplate) => void
 }): ReactElement {
   const deleting = dialog.kind === 'delete'
+  const isCreateFile = dialog.kind === 'create-file'
   return (
     <div
       className="ds-no-drag fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/18 px-4 backdrop-blur-[2px] dark:bg-black/35"
@@ -505,12 +529,27 @@ function WriteEntryDialog({
           {entryDialogDescription(dialog, t)}
         </p>
         {!deleting ? (
-          <input
-            autoFocus
-            value={dialog.value}
-            onChange={(event) => onValueChange(event.target.value)}
-            className="mt-4 w-full rounded-xl border border-ds-border bg-ds-main/65 px-3 py-2 text-[14px] text-ds-ink outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/25"
-          />
+          <>
+            {isCreateFile ? (
+              <div className="mt-3">
+                <WriteTemplatePicker
+                  workspaceRoot={workspaceRoot}
+                  onSelect={onSelectTemplate}
+                />
+              </div>
+            ) : null}
+            <input
+              autoFocus
+              value={dialog.value}
+              onChange={(event) => onValueChange(event.target.value)}
+              className="mt-4 w-full rounded-xl border border-ds-border bg-ds-main/65 px-3 py-2 text-[14px] text-ds-ink outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/25"
+            />
+            {selectedTemplate ? (
+              <p className="mt-1.5 text-[11px] text-accent">
+                Using template: {selectedTemplate.name}
+              </p>
+            ) : null}
+          </>
         ) : null}
         <div className="mt-5 flex justify-end gap-2">
           <button
