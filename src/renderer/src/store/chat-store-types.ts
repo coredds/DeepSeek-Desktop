@@ -30,8 +30,8 @@ export type SendMessageOverrides = {
 
 export type InitialSetupMode = 'required' | 'preview'
 export type SettingsRouteSection = 'general' | 'write' | 'agents' | 'skill' | 'mcp' | 'claw'
-export type AppRoute = 'chat' | 'write' | 'settings' | 'plugins' | 'claw'
-export type PluginHostRoute = 'chat' | 'claw'
+export type AppRoute = 'chat' | 'chat-pure' | 'write' | 'settings' | 'plugins' | 'claw'
+export type PluginHostRoute = 'chat' | 'chat-pure' | 'claw'
 
 export type ChatState = {
   route: AppRoute
@@ -76,6 +76,7 @@ export type ChatState = {
   setRoute: (r: AppRoute) => void
   openWrite: () => Promise<void>
   openCode: () => Promise<void>
+  openPureChat: () => Promise<void>
   ensureWriteThreadForWorkspace: (workspaceRoot?: string) => Promise<string | null>
   createWriteThread: (workspaceRoot?: string) => Promise<string | null>
   selectWriteThread: (threadId: string, workspaceRoot?: string) => Promise<void>

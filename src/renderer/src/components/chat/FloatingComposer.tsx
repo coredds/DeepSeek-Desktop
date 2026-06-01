@@ -118,7 +118,7 @@ export function FloatingComposer({
     ? threads.find((thread) => thread.id === activeThreadId) ?? null
     : null
   const activeThreadArchived = activeThread?.archived === true
-  const showThreadUsageFooter = !compact && route === 'chat' && Boolean(activeThreadId) && runtimeReady
+  const showThreadUsageFooter = !compact && (route === 'chat' || route === 'chat-pure') && Boolean(activeThreadId) && runtimeReady
   const threadUsageState = useThreadUsageState(
     activeThreadId,
     showThreadUsageFooter,
@@ -137,7 +137,9 @@ export function FloatingComposer({
   const canCompose = runtimeReady && (
     route === 'claw'
       ? clawHasInboundConversation
-      : (hasActiveThread || !!effectiveWorkspaceRoot)
+      : route === 'chat-pure'
+        ? true
+        : (hasActiveThread || !!effectiveWorkspaceRoot)
   )
   const canChangeModel = canCompose && !busy
   const canSend = canCompose && input.trim().length > 0
@@ -155,30 +157,42 @@ export function FloatingComposer({
   }, [composerModel, composerPickList])
   const placeholder = !runtimeReady
     ? t('runtimeActionNeedsConnection')
-    : !hasActiveThread && !effectiveWorkspaceRoot
-      ? t('workspaceRequiredToCreateThread')
-      : busy
+    : route === 'chat-pure'
+      ? busy
         ? t('composerQueuePlaceholder')
         : mode === 'plan'
         ? t('composerPlanPlaceholder')
-        : route === 'claw'
-            ? clawHasInboundConversation
-              ? t('clawPlaceholder', { name: clawAgentName })
-              : t('clawPlaceholderNeedsInbound')
-            : hasActiveThread
-            ? t('placeholder')
-            : t('composerStartsThread')
+        : hasActiveThread
+          ? t('placeholder')
+          : t('composerStartsThread')
+      : !hasActiveThread && !effectiveWorkspaceRoot
+        ? t('workspaceRequiredToCreateThread')
+        : busy
+          ? t('composerQueuePlaceholder')
+          : mode === 'plan'
+          ? t('composerPlanPlaceholder')
+          : route === 'claw'
+              ? clawHasInboundConversation
+                ? t('clawPlaceholder', { name: clawAgentName })
+                : t('clawPlaceholderNeedsInbound')
+              : hasActiveThread
+              ? t('placeholder')
+              : t('composerStartsThread')
   const footerHint = !runtimeReady
     ? t('composerOfflineHint')
-    : !hasActiveThread && !effectiveWorkspaceRoot
-      ? t('composerWorkspaceHint')
-      : mode === 'plan'
+    : route === 'chat-pure'
+      ? mode === 'plan'
         ? t('planModeActiveHint')
-        : route === 'claw'
-          ? clawHasInboundConversation
-            ? t('clawComposerHint')
-            : t('clawComposerHintNeedsInbound')
-          : t('composerSlashHint')
+        : t('composerSlashHint')
+      : !hasActiveThread && !effectiveWorkspaceRoot
+        ? t('composerWorkspaceHint')
+        : mode === 'plan'
+          ? t('planModeActiveHint')
+          : route === 'claw'
+            ? clawHasInboundConversation
+              ? t('clawComposerHint')
+              : t('clawComposerHintNeedsInbound')
+            : t('composerSlashHint')
   const slashCommands = useMemo<SlashCommand[]>(() => {
     const threadActionDisabled = !runtimeReady || busy || !activeThreadId
     const commands: SlashCommand[] = [

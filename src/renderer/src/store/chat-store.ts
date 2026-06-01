@@ -28,7 +28,7 @@ import {
   saveThreadForkRegistry
 } from '../lib/thread-fork-registry'
 import { workspaceLabelFromPath } from '../lib/workspace-label'
-import { isClawWorkspacePath, isInternalTemporaryWorkspace, normalizeWorkspaceRoot } from '../lib/workspace-path'
+import { isClawWorkspacePath, isInternalTemporaryWorkspace, isPureChatWorkspace, normalizeWorkspaceRoot, PURE_CHAT_WORKSPACE } from '../lib/workspace-path'
 import {
   buildClawRuntimePrompt,
   wrapWithAppContext,
@@ -269,6 +269,7 @@ function isCodeThread(thread: NormalizedThread): boolean {
     thread.archived !== true &&
     !isInternalTemporaryWorkspace(thread.workspace) &&
     !isClawWorkspacePath(thread.workspace) &&
+    !isPureChatWorkspace(thread.workspace) &&
     !isWriteThreadId(thread.id)
 }
 
@@ -836,6 +837,37 @@ export const useChatStore = create<ChatState>((set, get) => ({
     syncTurnCompletionPoll(set, get)
   },
 
+  openPureChat: async () => {
+    const state = get()
+    const pureChatThreads = state.threads.filter(
+      (thread) => isPureChatWorkspace(thread.workspace) && thread.archived !== true
+    )
+    const activeThread = state.activeThreadId
+      ? state.threads.find((thread) => thread.id === state.activeThreadId) ?? null
+      : null
+    if (activeThread && isPureChatWorkspace(activeThread.workspace)) {
+      set({ route: 'chat-pure' })
+      return
+    }
+    sseAbort?.abort()
+    sseAbort = null
+    clearBusyWatchdog()
+    const nextWatch = { ...state.watchTurnCompletion }
+    if (state.activeThreadId && state.busy) {
+      nextWatch[state.activeThreadId] = true
+      watchCompletionNotificationKeys.set(state.activeThreadId, `watch:${state.activeThreadId}:${Date.now()}`)
+    }
+    set({
+      ...clearedThreadSelection(),
+      route: 'chat-pure',
+      watchTurnCompletion: nextWatch
+    })
+    syncTurnCompletionPoll(set, get)
+    if (pureChatThreads.length > 0 && state.runtimeConnection === 'ready') {
+      await get().selectThread(latestThread(pureChatThreads)!.id)
+    }
+  },
+
   openWrite: async () => {
     const state = get()
     const selectedWorkspace = await readActiveWriteWorkspace(state.workspaceRoot)
@@ -1327,30 +1359,34 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return
     }
     try {
-      const { providerId } = get()
+      const { providerId, route: currentRoute } = get()
       const p = getProvider(providerId)
+      const isPureChat = currentRoute === 'chat-pure'
       const settings = await window.dsGui.getSettings()
       const activeThread = get().activeThreadId
         ? get().threads.find((thread) => thread.id === get().activeThreadId)
         : null
-      const workspaceRoot =
-        normalizeWorkspaceRoot(options.workspaceRoot) ||
-        (activeThread && !isInternalTemporaryWorkspace(activeThread.workspace)
-          ? normalizeWorkspaceRoot(activeThread.workspace)
-          : '') ||
-        normalizeWorkspaceRoot(settings.workspaceRoot)
+      const workspaceRoot = isPureChat
+        ? PURE_CHAT_WORKSPACE
+        : normalizeWorkspaceRoot(options.workspaceRoot) ||
+          (activeThread && !isInternalTemporaryWorkspace(activeThread.workspace)
+            ? normalizeWorkspaceRoot(activeThread.workspace)
+            : '') ||
+          normalizeWorkspaceRoot(settings.workspaceRoot)
       if (!workspaceRoot) {
         await get().chooseWorkspace({ createThreadAfter: true })
         return
       }
-      const reusableThreadId = await findReusableEmptyThreadId(get(), p, workspaceRoot, isCodeThread)
-      if (reusableThreadId) {
-        if (get().activeThreadId !== reusableThreadId) {
-          await get().selectThread(reusableThreadId)
-        } else {
-          set({ error: null })
+      if (!isPureChat) {
+        const reusableThreadId = await findReusableEmptyThreadId(get(), p, workspaceRoot, isCodeThread)
+        if (reusableThreadId) {
+          if (get().activeThreadId !== reusableThreadId) {
+            await get().selectThread(reusableThreadId)
+          } else {
+            set({ error: null })
+          }
+          return
         }
-        return
       }
       const t = await p.createThread({
         workspace: workspaceRoot,
@@ -1621,8 +1657,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }))
     if (!activeThreadId) {
       try {
+        const isPureChat = get().route === 'chat-pure'
         const settings = await window.dsGui.getSettings()
-        const workspaceRoot = normalizeWorkspaceRoot(settings.workspaceRoot)
+        const workspaceRoot = isPureChat
+          ? PURE_CHAT_WORKSPACE
+          : normalizeWorkspaceRoot(settings.workspaceRoot)
         if (!workspaceRoot) {
           set({
             blocks: previousBlocks,
@@ -1638,7 +1677,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           })
           return false
         }
-        const reusableThreadId = await findReusableEmptyThreadId(get(), p, workspaceRoot, isCodeThread)
+        const reusableThreadId = isPureChat
+          ? null
+          : await findReusableEmptyThreadId(get(), p, workspaceRoot, isCodeThread)
         const reusableThread = reusableThreadId
           ? get().threads.find((thread) => thread.id === reusableThreadId) ?? null
           : null
@@ -1699,7 +1740,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const channel = get().route === 'claw' ? activeClawChannel(get()) : null
       const runtimeText = channel
         ? buildClawRuntimePrompt(await window.dsGui.getSettings(), trimmedText, { channel })
-        : wrapWithAppContext(trimmedText)
+        : get().route === 'chat-pure'
+          ? trimmedText
+          : wrapWithAppContext(trimmedText)
       const { turnId, userMessageItemId } = await p.sendUserMessage(activeThreadId, runtimeText, {
         mode,
         ...(composerModel ? { model: composerModel } : {})

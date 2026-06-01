@@ -17,6 +17,7 @@ import {
   WORKSPACE_FILE_PREVIEW_EVENT,
   type WorkspaceFilePreviewDetail
 } from '../lib/workspace-file-preview'
+import { PURE_CHAT_WORKSPACE } from '../lib/workspace-path'
 import { Sidebar } from './chat/Sidebar'
 import { WorkbenchTopBar, type RightPanelMode } from './chat/WorkbenchTopBar'
 import { MessageTimeline } from './chat/MessageTimeline'
@@ -244,6 +245,7 @@ export function Workbench(): ReactElement {
     setRoute,
     openCode,
     openWrite,
+    openPureChat,
     ensureWriteThreadForWorkspace,
     createWriteThread,
     openSettings,
@@ -289,6 +291,7 @@ export function Workbench(): ReactElement {
       setRoute: s.setRoute,
       openCode: s.openCode,
       openWrite: s.openWrite,
+      openPureChat: s.openPureChat,
       ensureWriteThreadForWorkspace: s.ensureWriteThreadForWorkspace,
       createWriteThread: s.createWriteThread,
       openSettings: s.openSettings,
@@ -392,7 +395,11 @@ export function Workbench(): ReactElement {
     route === 'chat' &&
     latestDevPreviewUrl !== null
   const codeThreads = useMemo(
-    () => threads.filter((thread) => !isWriteThreadId(thread.id)),
+    () => threads.filter((thread) => !isWriteThreadId(thread.id) && thread.workspace !== PURE_CHAT_WORKSPACE),
+    [threads]
+  )
+  const pureChatThreads = useMemo(
+    () => threads.filter((thread) => thread.workspace === PURE_CHAT_WORKSPACE),
     [threads]
   )
 
@@ -482,10 +489,10 @@ export function Workbench(): ReactElement {
   }, [latestAutoOpenDevPreviewUrl, route])
 
   useEffect(() => {
-    if (workspaceRoot.trim()) return
+    if (workspaceRoot.trim() || route === 'chat-pure') return
     setTerminalPanelVisible(false)
     setTerminalPanelMounted(false)
-  }, [workspaceRoot])
+  }, [workspaceRoot, route])
 
   useEffect(() => {
     if (route !== 'write') return
@@ -711,13 +718,22 @@ export function Workbench(): ReactElement {
   }
 
   const openThread = (id: string): void => {
-    setRoute('chat')
+    const thread = threads.find((t) => t.id === id)
+    if (thread && thread.workspace === PURE_CHAT_WORKSPACE) {
+      setRoute('chat-pure')
+    } else {
+      setRoute('chat')
+    }
     void selectThread(id)
   }
 
   const startNewChat = (): void => {
-    setRoute('chat')
-    void createThread()
+    if (route === 'chat-pure') {
+      void createThread()
+    } else {
+      setRoute('chat')
+      void createThread()
+    }
   }
 
   const startNewChatInWorkspace = (workspaceRoot: string): void => {
@@ -725,9 +741,11 @@ export function Workbench(): ReactElement {
     void createThread({ workspaceRoot })
   }
 
-  const sidebarView: 'chat' | 'write' | 'claw' =
+  const sidebarView: 'chat-pure' | 'chat' | 'write' | 'claw' =
     route === 'claw' || (route === 'plugins' && pluginHostRoute === 'claw')
       ? 'claw'
+      : route === 'chat-pure'
+        ? 'chat-pure'
       : route === 'write'
         ? 'write'
         : 'chat'
@@ -1005,6 +1023,7 @@ export function Workbench(): ReactElement {
             {route === 'write' ? (
               <WriteSidebar
                 activeView={sidebarView}
+                onPureChatOpen={() => void openPureChat()}
                 onCodeOpen={() => void openCode()}
                 onWriteOpen={() => void openWrite()}
                 onClawOpen={() => openClaw()}
@@ -1012,7 +1031,7 @@ export function Workbench(): ReactElement {
               />
             ) : (
             <Sidebar
-              threads={codeThreads}
+              threads={sidebarView === 'chat-pure' ? pureChatThreads : codeThreads}
               activeThreadId={activeThreadId}
               activeView={sidebarView}
               pluginsActive={route === 'plugins'}
@@ -1027,7 +1046,8 @@ export function Workbench(): ReactElement {
               onNewChat={startNewChat}
               onNewChatInWorkspace={startNewChatInWorkspace}
               onOpenSettings={(section) => openSettings(section)}
-              onOpenPlugins={() => openPlugins(sidebarView === 'claw' ? 'claw' : 'chat')}
+              onOpenPlugins={() => openPlugins(sidebarView === 'claw' ? 'claw' : sidebarView === 'chat-pure' ? 'chat-pure' : 'chat')}
+              onPureChatOpen={() => void openPureChat()}
               onCodeOpen={() => void openCode()}
               onWriteOpen={() => void openWrite()}
               onClawOpen={() => openClaw()}
@@ -1121,7 +1141,7 @@ export function Workbench(): ReactElement {
                     rightPanelMode={rightPanelMode}
                     onToggleRightPanelMode={toggleRightPanelMode}
                     terminalPanelOpen={terminalPanelVisible}
-                    terminalPanelEnabled={workspaceRoot.trim().length > 0}
+                    terminalPanelEnabled={workspaceRoot.trim().length > 0 && route !== 'chat-pure'}
                     onToggleTerminalPanel={toggleTerminalPanel}
                   />
                 </div>

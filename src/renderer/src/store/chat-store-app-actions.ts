@@ -27,6 +27,7 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
   | 'openSettings'
   | 'openPlugins'
   | 'openClaw'
+  | 'openPureChat'
   | 'openInitialSetup'
   | 'closeInitialSetup'
   | 'selectInspectorItem'
@@ -95,12 +96,16 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
     openPlugins: (host?: PluginHostRoute) =>
       set((state) => ({
         route: 'plugins',
-        pluginHostRoute: host ?? (state.route === 'claw' ? 'claw' : 'chat')
+        pluginHostRoute: host ?? (state.route === 'claw' ? 'claw' : state.route === 'chat-pure' ? 'chat-pure' : 'chat')
       })),
 
     openClaw: () => {
       set({ route: 'claw' })
       void get().refreshClawChannels()
+    },
+
+    openPureChat: async () => {
+      set({ route: 'chat-pure' })
     },
 
     openInitialSetup: (mode: InitialSetupMode = 'required') =>

@@ -170,7 +170,7 @@ export function MessageTimeline({
     () => clawChannels.find((channel) => channel.id === activeClawChannelId) ?? null,
     [activeClawChannelId, clawChannels]
   )
-  const heroRoute: 'chat' | 'claw' = route === 'claw' ? 'claw' : 'chat'
+  const heroRoute: 'chat' | 'claw' | 'chat-pure' = route === 'claw' ? 'claw' : route === 'chat-pure' ? 'chat-pure' : 'chat'
   const hasContent = blocks.length > 0 || live || liveReasoning
   const endRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -456,7 +456,7 @@ function EmptyHero({
   onOpenDiagnostics,
   onSelectSuggestion
 }: {
-  route: 'chat' | 'claw'
+  route: 'chat' | 'claw' | 'chat-pure'
   ready: boolean
   hasWorkspace: boolean
   activeClawChannel: ClawImChannelV1 | null
@@ -507,7 +507,7 @@ function EmptyHero({
     )
   }
 
-  if (!hasWorkspace) {
+  if (route !== 'chat-pure' && !hasWorkspace) {
     return (
       <div className="ds-no-drag flex flex-col items-center justify-center px-6 py-24 text-center">
         <FolderOpen className="mb-4 h-8 w-8 text-ds-muted" strokeWidth={1.6} />

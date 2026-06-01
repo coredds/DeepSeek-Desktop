@@ -1,9 +1,10 @@
 import type { ReactElement } from 'react'
-import { Bot, Code2, PencilLine } from 'lucide-react'
+import { Bot, Code2, MessageSquare, PencilLine } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 type Props = {
-  activeView: 'chat' | 'write' | 'claw'
+  activeView: 'chat-pure' | 'chat' | 'write' | 'claw'
+  onPureChatOpen: () => void
   onCodeOpen: () => void
   onWriteOpen: () => void
   onClawOpen: () => void
@@ -11,6 +12,7 @@ type Props = {
 
 export function WorkspaceModeTabs({
   activeView,
+  onPureChatOpen,
   onCodeOpen,
   onWriteOpen,
   onClawOpen
@@ -27,10 +29,20 @@ export function WorkspaceModeTabs({
   return (
     <div
       role="tablist"
-      aria-label={`${t('code')} / ${t('write')} / ${t('claw')}`}
+      aria-label={`${t('chat')} / ${t('code')} / ${t('write')} / ${t('claw')}`}
       className="mb-4 rounded-[12px] border border-ds-border-muted/45 bg-ds-subtle/72 p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.52)] backdrop-blur dark:bg-white/[0.045] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
     >
-      <div className="grid h-[34px] grid-cols-3 gap-0.5">
+      <div className="grid h-[34px] grid-cols-4 gap-0.5">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeView === 'chat-pure'}
+          onClick={onPureChatOpen}
+          className={tabClass(activeView === 'chat-pure')}
+        >
+          <MessageSquare className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
+          <span className="truncate">{t('chat')}</span>
+        </button>
         <button
           type="button"
           role="tab"

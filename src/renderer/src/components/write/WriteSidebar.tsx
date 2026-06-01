@@ -27,7 +27,8 @@ import { WriteFileTree } from './WriteFileTree'
 import { WriteTemplatePicker, type WriteTemplate } from './WriteTemplatePicker'
 
 type Props = {
-  activeView: 'chat' | 'write' | 'claw'
+  activeView: 'chat-pure' | 'chat' | 'write' | 'claw'
+  onPureChatOpen: () => void
   onCodeOpen: () => void
   onWriteOpen: () => void
   onClawOpen: () => void
@@ -44,6 +45,7 @@ type Translate = (key: string, opts?: Record<string, unknown>) => string
 
 export function WriteSidebar({
   activeView,
+  onPureChatOpen,
   onCodeOpen,
   onWriteOpen,
   onClawOpen,
@@ -237,6 +239,7 @@ export function WriteSidebar({
       <div className="ds-no-drag flex flex-col px-1">
         <WorkspaceModeTabs
           activeView={activeView}
+          onPureChatOpen={onPureChatOpen}
           onCodeOpen={onCodeOpen}
           onWriteOpen={onWriteOpen}
           onClawOpen={onClawOpen}

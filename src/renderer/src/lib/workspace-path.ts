@@ -1,5 +1,11 @@
+export const PURE_CHAT_WORKSPACE = '__deepseekdesktop_pure_chat__'
+
 function normalizePathForMatch(path: string): string {
   return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+}
+
+export function isPureChatWorkspace(path?: string): boolean {
+  return (path?.trim() ?? '') === PURE_CHAT_WORKSPACE
 }
 
 export function isInternalTemporaryWorkspace(path?: string): boolean {

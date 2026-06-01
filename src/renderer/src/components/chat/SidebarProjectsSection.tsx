@@ -24,7 +24,7 @@ import { isClawWorkspacePath, isInternalTemporaryWorkspace, normalizeWorkspaceRo
 
 type SidebarProjectsSectionProps = {
   threads: NormalizedThread[]
-  activeView: 'chat' | 'write' | 'claw'
+  activeView: 'chat-pure' | 'chat' | 'write' | 'claw'
   activeThreadId: string | null
   runtimeReady: boolean
   searchQuery: string
@@ -299,7 +299,7 @@ export function SidebarProjectsSection({
                       <ThreadRow
                         key={thread.id}
                         thread={thread}
-                        active={(activeView === 'chat' || activeView === 'write') && activeThreadId === thread.id}
+                        active={(activeView === 'chat' || activeView === 'write' || activeView === 'chat-pure') && activeThreadId === thread.id}
                         deleting={deletingThreadIds[thread.id] === true}
                         locale={locale}
                         showRunning={

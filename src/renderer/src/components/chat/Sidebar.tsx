@@ -24,7 +24,7 @@ import { WorkspaceModeTabs } from './WorkspaceModeTabs'
 type Props = {
   threads: NormalizedThread[]
   activeThreadId: string | null
-  activeView: 'chat' | 'write' | 'claw'
+  activeView: 'chat-pure' | 'chat' | 'write' | 'claw'
   pluginsActive: boolean
   runtimeReady: boolean
   threadSearch: string
@@ -38,6 +38,7 @@ type Props = {
   onNewChatInWorkspace: (workspaceRoot: string) => void
   onOpenSettings: (section?: SettingsRouteSection) => void
   onOpenPlugins: () => void
+  onPureChatOpen: () => void
   onCodeOpen: () => void
   onWriteOpen: () => void
   onClawOpen: () => void
@@ -60,6 +61,7 @@ export function Sidebar({
   onNewChatInWorkspace,
   onOpenSettings,
   onOpenPlugins,
+  onPureChatOpen,
   onCodeOpen,
   onWriteOpen,
   onClawOpen
@@ -115,6 +117,7 @@ export function Sidebar({
       <div className="ds-no-drag flex flex-col px-1">
         <WorkspaceModeTabs
           activeView={activeView}
+          onPureChatOpen={onPureChatOpen}
           onCodeOpen={onCodeOpen}
           onWriteOpen={onWriteOpen}
           onClawOpen={onClawOpen}
