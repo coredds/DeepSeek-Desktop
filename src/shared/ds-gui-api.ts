@@ -8,6 +8,8 @@ import type {
 import type { DeepseekUpdateInfo, DeepseekUpdateInstallResult } from './deepseek-update'
 import type { EditorListResult, EditorOpenResult, OpenEditorPathOptions } from './editor'
 import type { GitBranchesResult } from './git-branches'
+import type { WorkspaceHealthResult } from './workspace-health'
+import type { WriteTemplate } from './write-template'
 import type {
   TerminalCreateOptions,
   TerminalCreateResult,
@@ -160,6 +162,8 @@ export type DsGuiApi = {
   openDeepseekConfigDir: () => Promise<PathOpenResult>
   diagnoseDeepseekRuntime: () => Promise<DeepseekRuntimeDiagnosticsResult>
   getGitBranches: (workspaceRoot: string) => Promise<GitBranchesResult>
+  getWorkspaceHealth: (workspaceRoot: string) => Promise<WorkspaceHealthResult>
+  listTemplates: () => Promise<WriteTemplate[]>
   switchGitBranch: (workspaceRoot: string, branch: string) => Promise<GitBranchesResult>
   createAndSwitchGitBranch: (workspaceRoot: string, branch: string) => Promise<GitBranchesResult>
   listEditors: () => Promise<EditorListResult>

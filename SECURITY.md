@@ -12,7 +12,6 @@ Please do not open public GitHub issues for security-sensitive bugs.
 
 Instead, report vulnerabilities privately through one of these channels:
 
-- email: [zhongxingyuemail@gmail.com](mailto:zhongxingyuemail@gmail.com)
 - GitHub Security Advisories: use the repository's private vulnerability reporting flow if enabled
 
 When possible, include:

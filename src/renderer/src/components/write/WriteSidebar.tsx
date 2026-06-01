@@ -533,7 +533,6 @@ function WriteEntryDialog({
             {isCreateFile ? (
               <div className="mt-3">
                 <WriteTemplatePicker
-                  workspaceRoot={workspaceRoot}
                   onSelect={onSelectTemplate}
                 />
               </div>

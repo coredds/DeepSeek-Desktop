@@ -41,16 +41,19 @@ export function KeyboardShortcutPanel({ open, onClose }: KeyboardShortcutPanelPr
 
   if (!open) return null
 
+  const isMac = window.dsGui?.platform === 'darwin'
+  const mod = isMac ? '⌘' : 'Ctrl'
+
   const groups: ShortcutGroup[] = [
     {
       title: t('keyboardGlobal'),
       items: [
-        { keys: ['Ctrl', '1'], label: t('shortcutTabCode') },
-        { keys: ['Ctrl', '2'], label: t('shortcutTabWrite') },
-        { keys: ['Ctrl', '3'], label: t('shortcutTabClaw') },
-        { keys: ['Ctrl', 'B'], label: t('shortcutToggleSidebar') },
-        { keys: ['Ctrl', 'J'], label: t('shortcutToggleTerminal') },
-        { keys: ['Ctrl', '\\'], label: t('shortcutToggleRightPanel') },
+        { keys: [mod, '1'], label: t('shortcutTabCode') },
+        { keys: [mod, '2'], label: t('shortcutTabWrite') },
+        { keys: [mod, '3'], label: t('shortcutTabClaw') },
+        { keys: [mod, 'B'], label: t('shortcutToggleSidebar') },
+        { keys: [mod, 'J'], label: t('shortcutToggleTerminal') },
+        { keys: [mod, '\\'], label: t('shortcutToggleRightPanel') },
         { keys: ['?'], label: t('shortcutShowShortcuts') }
       ]
     },
@@ -59,7 +62,7 @@ export function KeyboardShortcutPanel({ open, onClose }: KeyboardShortcutPanelPr
       items: [
         { keys: ['Enter'], label: t('shortcutSend') },
         { keys: ['Shift', 'Enter'], label: t('shortcutNewline') },
-        { keys: ['Ctrl', 'Enter'], label: t('shortcutSendAlt') }
+        { keys: [mod, 'Enter'], label: t('shortcutSendAlt') }
       ]
     },
     {

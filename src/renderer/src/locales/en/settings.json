@@ -151,6 +151,8 @@
   "firstRunSampleWorkspace": "Try with a sample workspace",
   "firstRunSampleSub": "Creates a demo project so you can explore immediately.",
   "firstRunCreatingSample": "Creating sample workspace…",
+  "firstRunStartingRuntime": "Starting DeepSeek runtime…",
+  "firstRunRuntimeFailed": "Failed to connect to DeepSeek runtime. Check your API key and try again.",
   "autoStart": "Auto-start `deepseek serve --http`",
   "autoStartDesc": "Recommended. Let the GUI launch and manage the local runtime automatically when needed.",
   "corsOrigins": "Extra CORS origins (comma-separated)",

@@ -55,6 +55,8 @@ import { getRuntimeBaseUrl } from '../settings-store'
 import type { ClawRuntime } from '../claw-runtime'
 import { findListeningProcessOnPort } from '../deepseek-process'
 import { createAndSwitchGitBranch, getGitBranches, switchGitBranch } from '../services/git-service'
+import { getWorkspaceHealth } from '../services/workspace-health-service'
+import { listTemplates } from '../services/template-service'
 import {
   createWorkspaceDirectory,
   createWorkspaceFile,
@@ -609,6 +611,12 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       return createAndSwitchGitBranch(request.workspaceRoot, request.branch)
     }
   )
+
+  ipcMain.handle('workspace:health', async (_, workspaceRoot: unknown) =>
+    getWorkspaceHealth(parseIpcPayload('workspace:health', workspaceRootSchema, workspaceRoot))
+  )
+
+  ipcMain.handle('templates:list', async () => listTemplates())
 
   ipcMain.handle('editor:list', async () => listEditorsResult())
   ipcMain.handle('editor:open-path', async (_, payload: unknown) =>

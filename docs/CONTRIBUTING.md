@@ -70,18 +70,20 @@ Before opening a PR, contributors should verify:
 
 ### CI Verification Commands
 
+These checks run automatically on every PR to `develop` and push to `develop`/`master` via GitHub Actions (`.github/workflows/ci.yml`). Run them locally before opening a PR:
+
 ```bash
 # Type checking
 npm run typecheck
 
-# Production build
-npm run build
+# Lint
+npm run lint
 
 # Unit tests
 npm run test
 
-# Full development smoke test
-npm run dev
+# Production build
+npm run build
 ```
 
 ## Coding Expectations

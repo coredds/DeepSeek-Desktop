@@ -4,7 +4,12 @@
 
 # DeepSeek Desktop
 
-[![License](https://img.shields.io/github/license/coredds/DeepSeek-Desktop)](./LICENSE)
+<p align="center">
+  <a href="https://github.com/coredds/DeepSeek-Desktop/actions/workflows/ci.yml"><img src="https://github.com/coredds/DeepSeek-Desktop/actions/workflows/ci.yml/badge.svg?branch=develop" alt="CI"></a>
+  <a href="https://github.com/coredds/DeepSeek-Desktop/releases"><img src="https://img.shields.io/github/package-json/v/coredds/DeepSeek-Desktop" alt="Version"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/coredds/DeepSeek-Desktop" alt="License"></a>
+  <a href="https://github.com/coredds/DeepSeek-Desktop"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey" alt="Platform"></a>
+</p>
 
 DeepSeek Desktop is a local desktop workbench for developers and frequent AI users. It builds on [DeepSeek TUI](https://github.com/Hmbown/DeepSeek-TUI) and turns the terminal agent experience into an easier, longer-lived app: choose a workspace, start a task, watch reasoning and tool calls stream in, review file changes, and approve sensitive actions when needed.
 
@@ -95,6 +100,10 @@ npm install --registry=https://registry.npmmirror.com
 
 1. Open DeepSeek Desktop.
 2. Enter your DeepSeek API key; set a custom Base URL if needed.
+3. Choose a theme or skip for later.
+4. Optionally click **"Try with a sample workspace"** to explore the app with a demo project immediately.
+
+The setup dialog shows progress as the DeepSeek runtime starts, so you can see when it's ready.
 
 Typical flow (**Code mode**):
 
@@ -125,10 +134,18 @@ Keyboard shortcuts:
 
 | Key | Action |
 | --- | --- |
+| `Ctrl+N` / `⌘N` | New agent thread |
+| `Ctrl+1` / `⌘1` | Switch to Code mode |
+| `Ctrl+2` / `⌘2` | Switch to Write mode |
+| `Ctrl+3` / `⌘3` | Switch to Claw mode |
+| `Ctrl+B` / `⌘B` | Toggle sidebar |
+| `Ctrl+J` / `⌘J` | Toggle terminal |
+| `Ctrl+\` / `⌘\` | Toggle right panel |
+| `?` | Show all keyboard shortcuts |
 | `Enter` | Send message |
 | `Shift+Enter` | Newline in composer |
-| `Ctrl+Enter` | Send message |
-| `Esc` | Close a panel or dismiss the current overlay |
+| `Ctrl+Enter` / `⌘Enter` | Send message (alt) |
+| `Esc` | Close current panel or overlay |
 
 ## Write Mode Design Notes
 

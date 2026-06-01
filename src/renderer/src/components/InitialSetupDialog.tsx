@@ -43,7 +43,6 @@ export function InitialSetupDialog(): ReactElement {
   const { t } = useTranslation('settings')
   const initialSetupMode = useChatStore((s) => s.initialSetupMode)
   const closeInitialSetup = useChatStore((s) => s.closeInitialSetup)
-  const applyI18n = useChatStore((s) => s.applyI18nFromSettings)
   const reloadUiSettings = useChatStore((s) => s.reloadUiSettings)
   const probeRuntime = useChatStore((s) => s.probeRuntime)
 
@@ -52,6 +51,7 @@ export function InitialSetupDialog(): ReactElement {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [creatingSample, setCreatingSample] = useState(false)
+  const [startPhase, setStartPhase] = useState<'idle' | 'saving' | 'starting'>('idle')
   const isPreview = initialSetupMode === 'preview'
 
   useEffect(() => {
@@ -81,6 +81,7 @@ export function InitialSetupDialog(): ReactElement {
 
   const handleClose = () => {
     setError(null)
+    setStartPhase('idle')
     closeInitialSetup()
     void reloadUiSettings()
   }
@@ -107,13 +108,19 @@ export function InitialSetupDialog(): ReactElement {
       if (typeof window.dsGui === 'undefined') throw new Error('Preload bridge missing')
       const next = await window.dsGui.setSettings(form)
       setForm(next)
-      await applyI18n(next.locale)
       void reloadUiSettings()
-      void probeRuntime('background')
-      closeInitialSetup()
+      setSaving(false)
+      setStartPhase('starting')
+      await probeRuntime('user')
+      const storeState = useChatStore.getState()
+      if (storeState.runtimeConnection === 'ready') {
+        handleClose()
+      } else {
+        setStartPhase('idle')
+        setError(storeState.error ?? t('firstRunRuntimeFailed'))
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
-    } finally {
       setSaving(false)
     }
   }
@@ -135,15 +142,22 @@ export function InitialSetupDialog(): ReactElement {
         }).catch(function () {})
       }
       setSaving(true)
+      setCreatingSample(false)
       const next = await window.dsGui.setSettings(form)
       setForm(next)
-      await applyI18n(next.locale)
       void reloadUiSettings()
-      void probeRuntime('background')
-      closeInitialSetup()
+      setSaving(false)
+      setStartPhase('starting')
+      await probeRuntime('user')
+      const storeState = useChatStore.getState()
+      if (storeState.runtimeConnection === 'ready') {
+        handleClose()
+      } else {
+        setStartPhase('idle')
+        setError(storeState.error ?? t('firstRunRuntimeFailed'))
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
-    } finally {
       setSaving(false)
       setCreatingSample(false)
     }
@@ -225,30 +239,6 @@ export function InitialSetupDialog(): ReactElement {
 
           <div className="space-y-3">
             <label className={labelClass}>
-              {t('language')}
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              {(['en'] as const).map((lang) => {
-                const isActive = form.locale === lang
-                return (
-                  <button
-                    key={lang}
-                    type="button"
-                    onClick={() => {
-                      updateForm({ locale: lang })
-                      void applyI18n(lang)
-                    }}
-                    className={choiceButtonClass(isActive)}
-                  >
-                    English
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <label className={labelClass}>
               {t('apiKey')}
             </label>
             <div className="relative">
@@ -297,12 +287,16 @@ export function InitialSetupDialog(): ReactElement {
         </div>
 
         <div className="space-y-4 px-8 pb-8 pt-1">
-          {(error || creatingSample) && (
-            <div className={`rounded-[18px] border px-4 py-3 text-[13px] ${error ? 'border-red-500/18 bg-red-500/[0.08] text-red-700 dark:border-red-500/20 dark:bg-red-500/[0.12] dark:text-red-200' : 'border-[#1388ff]/18 bg-[#1388ff]/[0.06] text-[#1388ff] dark:border-[#3aa0ff]/18 dark:bg-[#3aa0ff]/[0.08] dark:text-[#7dc1ff]'}`}>
+          {(error || creatingSample || startPhase === 'starting') && (
+            <div className={`rounded-[18px] border px-4 py-3 text-[13px] ${
+              error
+                ? 'border-red-500/18 bg-red-500/[0.08] text-red-700 dark:border-red-500/20 dark:bg-red-500/[0.12] dark:text-red-200'
+                : 'border-[#1388ff]/18 bg-[#1388ff]/[0.06] text-[#1388ff] dark:border-[#3aa0ff]/18 dark:bg-[#3aa0ff]/[0.08] dark:text-[#7dc1ff]'
+            }`}>
               {error || (
                 <span className="inline-flex items-center gap-2">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {t('firstRunCreatingSample')}
+                  {creatingSample ? t('firstRunCreatingSample') : t('firstRunStartingRuntime')}
                 </span>
               )}
             </div>
@@ -312,23 +306,24 @@ export function InitialSetupDialog(): ReactElement {
             <button
               type="button"
               onClick={handleClose}
-              className="h-11 rounded-[16px] border border-slate-300/80 bg-white/75 px-4 text-[15px] font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-white dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:border-white/16 dark:hover:bg-white/[0.06]"
+              disabled={startPhase !== 'idle'}
+              className="h-11 rounded-[16px] border border-slate-300/80 bg-white/75 px-4 text-[15px] font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-white disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:border-white/16 dark:hover:bg-white/[0.06]"
             >
               {t('firstRunSkipForNow')}
             </button>
             <button
               type="button"
-              disabled={saving || creatingSample}
+              disabled={saving || creatingSample || startPhase !== 'idle'}
               onClick={handleSave}
               className="h-11 rounded-[16px] bg-[linear-gradient(180deg,#2392ff_0%,#0e7df0_100%)] px-4 text-[15px] font-semibold text-white shadow-[0_16px_34px_rgba(19,136,255,0.24)] transition hover:opacity-95 disabled:opacity-50 dark:bg-[linear-gradient(180deg,#2c9dff_0%,#1584f6_100%)] dark:shadow-[0_16px_34px_rgba(21,132,246,0.22)]"
             >
-              {saving || creatingSample ? t('firstRunSaving') : t('firstRunSave')}
+              {saving || startPhase === 'starting' ? t('firstRunStartingRuntime') : t('firstRunSave')}
             </button>
           </div>
 
           <button
             type="button"
-            disabled={saving || creatingSample}
+            disabled={saving || creatingSample || startPhase !== 'idle'}
             onClick={handleCreateSampleWorkspace}
             className="flex w-full h-11 items-center justify-center gap-2 rounded-[16px] border border-[#1388ff]/20 bg-[#1388ff]/[0.04] px-4 text-[14px] font-semibold text-[#1388ff] transition hover:bg-[#1388ff]/[0.08] disabled:opacity-50 dark:border-[#3aa0ff]/18 dark:bg-[#3aa0ff]/[0.06] dark:text-[#7dc1ff] dark:hover:bg-[#3aa0ff]/[0.1]"
           >

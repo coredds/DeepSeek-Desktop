@@ -911,5 +911,8 @@
   "shortcutTabClaw": "Switch to Claw mode",
   "shortcutShowShortcuts": "Show this panel",
   "workspaceHealthDirtyFiles": "{{count}} uncommitted files",
-  "workspaceHealthDirtyFiles_one": "1 uncommitted file"
+  "workspaceHealthDirtyFiles_one": "1 uncommitted file",
+  "workspaceHealthLowDisk": "Low disk space: {{free}} free",
+  "workspaceHealthLargeFiles": "{{count}} large files (>100MB)",
+  "workspaceHealthLargeFiles_one": "1 large file (>100MB)"
 }

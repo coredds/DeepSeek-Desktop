@@ -5,81 +5,39 @@ import {
   Loader2,
   type LucideIcon
 } from 'lucide-react'
+import type { WriteTemplate } from '@shared/write-template'
 
-export type WriteTemplate = {
-  name: string
-  filename: string
-  content: string
-  description?: string
-}
+export type { WriteTemplate }
 
 type Props = {
-  workspaceRoot: string
   onSelect: (template: WriteTemplate) => void
   icon?: LucideIcon
 }
 
-const TEMPLATES_DIR = 'templates'
-
 export function WriteTemplatePicker({
-  workspaceRoot,
   onSelect,
   icon: Icon = FileText
 }: Props): ReactElement {
   const [templates, setTemplates] = useState<WriteTemplate[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const loadTemplates = useCallback(async () => {
-    if (!workspaceRoot || typeof window.dsGui === 'undefined') return
+    if (typeof window.dsGui === 'undefined') return
     setLoading(true)
-    setError(null)
+    setTemplates([])
     try {
-      const list = await window.dsGui.listWorkspaceDirectory({
-        workspaceRoot,
-        path: TEMPLATES_DIR
-      })
-      if (!list.ok) {
-        setTemplates([])
-        return
-      }
-      const mdFiles = list.entries.filter(
-        (e) => e.type === 'file' && /\.md$/i.test(e.name)
-      )
-      const loaded: WriteTemplate[] = []
-      for (const file of mdFiles.slice(0, 12)) {
-        try {
-          const result = await window.dsGui.readWorkspaceFile({
-            workspaceRoot,
-            path: file.path
-          })
-          if (result.ok && result.content) {
-            const content = result.content
-            const frontmatter = parseTemplateFrontmatter(content)
-            loaded.push({
-              name: frontmatter.title || file.name.replace(/\.md$/i, ''),
-              filename: frontmatter.suggestedFilename || file.name,
-              content: frontmatter.body || content,
-              description: frontmatter.description
-            })
-          }
-        } catch {
-          // skip unreadable templates
-        }
-      }
+      const loaded = await window.dsGui.listTemplates()
       setTemplates(loaded)
     } catch {
-      setError('Could not load templates')
+      setTemplates([])
     } finally {
       setLoading(false)
     }
-  }, [workspaceRoot])
+  }, [])
 
   useEffect(() => {
-    if (workspaceRoot) void loadTemplates()
-  }, [workspaceRoot, loadTemplates])
-
-  if (!workspaceRoot) return <></>
+    void loadTemplates()
+  }, [loadTemplates])
 
   if (loading) {
     return (
@@ -90,7 +48,7 @@ export function WriteTemplatePicker({
     )
   }
 
-  if (error || templates.length === 0) return <></>
+  if (templates.length === 0) return <></>
 
   return (
     <div className="space-y-1.5">
@@ -113,33 +71,4 @@ export function WriteTemplatePicker({
       </div>
     </div>
   )
-}
-
-function parseTemplateFrontmatter(content: string): {
-  title?: string
-  description?: string
-  suggestedFilename?: string
-  body: string
-} {
-  const trimmed = content.trimStart()
-  if (!trimmed.startsWith('---')) return { body: content }
-
-  const endIndex = trimmed.indexOf('---', 3)
-  if (endIndex < 0) return { body: content }
-
-  const frontmatterText = trimmed.slice(3, endIndex).trim()
-  const body = trimmed.slice(endIndex + 3).trimStart()
-  const result: ReturnType<typeof parseTemplateFrontmatter> = { body: body || content }
-
-  for (const line of frontmatterText.split('\n')) {
-    const match = line.match(/^(\w[\w\s]*?):\s*(.+)$/)
-    if (!match) continue
-    const key = match[1].trim().toLowerCase()
-    const value = match[2].trim()
-    if (key === 'title') result.title = value
-    if (key === 'description') result.description = value
-    if (key === 'filename') result.suggestedFilename = value
-  }
-
-  return result
 }

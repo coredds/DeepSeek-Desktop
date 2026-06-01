@@ -43,6 +43,10 @@ const api = {
     ipcRenderer.invoke('git:switch-branch', { workspaceRoot, branch }),
   createAndSwitchGitBranch: (workspaceRoot, branch) =>
     ipcRenderer.invoke('git:create-and-switch-branch', { workspaceRoot, branch }),
+  getWorkspaceHealth: (workspaceRoot) =>
+    ipcRenderer.invoke('workspace:health', workspaceRoot),
+  listTemplates: () =>
+    ipcRenderer.invoke('templates:list'),
   listEditors: () => ipcRenderer.invoke('editor:list'),
   openEditorPath: (options) =>
     ipcRenderer.invoke('editor:open-path', options),

@@ -265,8 +265,12 @@ function SidebarLink({
       <span className="flex-1 truncate text-left">{label}</span>
       {shortcut ? (
         <kbd className="ds-kbd hidden items-center gap-0.5 rounded-md px-1.5 py-0.5 font-mono text-[11.5px] font-medium text-ds-faint sm:inline-flex">
-          <Command className="h-2.5 w-2.5" strokeWidth={2} />
-          {shortcut.replace('⌘', '')}
+          {window.dsGui?.platform === 'darwin' ? (
+            <Command className="h-2.5 w-2.5" strokeWidth={2} />
+          ) : (
+            <span className="text-[10px]">Ctrl</span>
+          )}
+          {window.dsGui?.platform === 'darwin' ? shortcut.replace('⌘', '') : `+${shortcut.replace('⌘', '')}`}
         </kbd>
       ) : null}
       {trailing ?? null}

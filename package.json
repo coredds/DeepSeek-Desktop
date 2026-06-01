@@ -1,6 +1,6 @@
 {
   "name": "deepseek-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Desktop workbench for the DeepSeek-TUI runtime (HTTP/SSE) — forked from DeepSeek GUI",
   "main": "./out/main/index.js",
   "type": "module",
