@@ -1,0 +1,96 @@
+import { mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+import { JsonSettingsStore } from './settings-store'
+
+describe('JsonSettingsStore', () => {
+  it('creates a default write workspace with welcome.md', async () => {
+    const userDataDir = await mkdtemp(join(tmpdir(), 'ds-gui-settings-'))
+
+    const store = new JsonSettingsStore(userDataDir)
+    const loaded = await store.load()
+
+    expect(loaded.write.defaultWorkspaceRoot).toContain('.deepseekdesktop')
+    expect(loaded.write.workspaces).toContain(loaded.write.defaultWorkspaceRoot)
+    expect(loaded.write.inlineCompletion.enabled).toBe(true)
+    expect(loaded.write.inlineCompletion.retrievalEnabled).toBe(true)
+    expect(loaded.write.inlineCompletion.longCompletionEnabled).toBe(true)
+    expect(loaded.write.inlineCompletion.baseUrl).toBe('https://api.deepseek.com/beta')
+    expect(loaded.write.inlineCompletion.model).toBe('deepseek-v4-flash')
+    expect(loaded.write.inlineCompletion.longMaxTokens).toBe(256)
+    expect(await readFile(join(loaded.write.defaultWorkspaceRoot, 'welcome.md'), 'utf8')).toContain('Welcome to Write')
+  })
+
+  it('preserves the pro write completion model', async () => {
+    const userDataDir = await mkdtemp(join(tmpdir(), 'ds-gui-settings-'))
+
+    await writeFile(
+      join(userDataDir, 'deepseek-desktop-settings.json'),
+      JSON.stringify({
+        version: 1,
+        write: {
+          inlineCompletion: {
+            model: 'deepseek-v4-pro'
+          }
+        }
+      }),
+      'utf8'
+    )
+
+    const store = new JsonSettingsStore(userDataDir)
+    const loaded = await store.load()
+
+    expect(loaded.write.inlineCompletion.model).toBe('deepseek-v4-pro')
+  })
+
+  it('preserves deepseek.autoStart=false when loading saved settings', async () => {
+    const userDataDir = await mkdtemp(join(tmpdir(), 'ds-gui-settings-'))
+    const workspaceRoot = join(userDataDir, 'workspace')
+    await mkdir(workspaceRoot, { recursive: true })
+
+    await writeFile(
+      join(userDataDir, 'deepseek-desktop-settings.json'),
+      JSON.stringify({
+        version: 1,
+        workspaceRoot,
+        deepseek: {
+          autoStart: false
+        }
+      }),
+      'utf8'
+    )
+
+    const store = new JsonSettingsStore(userDataDir)
+    const loaded = await store.load()
+
+    expect(loaded.deepseek.autoStart).toBe(false)
+  })
+
+  it('backs up invalid JSON and replaces it with defaults', async () => {
+    const userDataDir = await mkdtemp(join(tmpdir(), 'ds-gui-settings-'))
+    const settingsPath = join(userDataDir, 'deepseek-desktop-settings.json')
+    await writeFile(settingsPath, '{ invalid json', 'utf8')
+
+    const store = new JsonSettingsStore(userDataDir)
+    const loaded = await store.load()
+    const files = await readdir(userDataDir)
+    const backupName = files.find((file) => file.startsWith('deepseek-desktop-settings.invalid-'))
+
+    expect(loaded.workspaceRoot.length).toBeGreaterThan(0)
+    expect(backupName).toBeTruthy()
+    expect(await readFile(join(userDataDir, backupName ?? ''), 'utf8')).toBe('{ invalid json')
+    const replaced = await readFile(settingsPath, 'utf8')
+    expect(() => JSON.parse(replaced)).not.toThrow()
+  })
+
+  it('throws for non-recoverable read errors', async () => {
+    const userDataDir = await mkdtemp(join(tmpdir(), 'ds-gui-settings-'))
+    const settingsPath = join(userDataDir, 'deepseek-desktop-settings.json')
+    await mkdir(settingsPath, { recursive: true })
+
+    const store = new JsonSettingsStore(userDataDir)
+
+    await expect(store.load()).rejects.toThrow(/Failed to read settings file/)
+  })
+})
