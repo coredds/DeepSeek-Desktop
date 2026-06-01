@@ -4,10 +4,6 @@
 
 # DeepSeek Desktop
 
-> Bring the local DeepSeek TUI agent into a desktop workbench: **Code** for development, **Write** for documents, **Claw** for IM automation—chat, change review, Skill/MCP management, and updates in one graphical app.
-
-> **Forked from [DeepSeek GUI](https://github.com/XingYu-Zhong/DeepSeek-GUI)** by XingYu-Zhong and contributors. This project builds on their excellent work with gratitude.
-
 [![License](https://img.shields.io/github/license/coredds/DeepSeek-Desktop)](./LICENSE)
 
 DeepSeek Desktop is a local desktop workbench for developers and frequent AI users. It builds on [DeepSeek TUI](https://github.com/Hmbown/DeepSeek-TUI) and turns the terminal agent experience into an easier, longer-lived app: choose a workspace, start a task, watch reasoning and tool calls stream in, review file changes, and approve sensitive actions when needed.
@@ -233,7 +229,9 @@ For the underlying runtime, see [DeepSeek TUI](https://github.com/Hmbown/DeepSee
 
 ## Acknowledgments
 
-- **[DeepSeek GUI](https://github.com/XingYu-Zhong/DeepSeek-GUI)** by XingYu-Zhong and contributors — the original project this is forked from. Licensed under MIT.
+> Bring the local DeepSeek TUI agent into a desktop workbench: **Code** for development, **Write** for documents, **Claw** for IM automation — chat, change review, Skill/MCP management, and updates in one graphical app.
+
+- **[DeepSeek GUI](https://github.com/XingYu-Zhong/DeepSeek-GUI)** by XingYu-Zhong and contributors — this project is forked from their excellent work. Licensed under MIT.
 - [DeepSeek TUI](https://github.com/Hmbown/DeepSeek-TUI): the local agent runtime behind the app.
 - [LobsterAI](https://github.com/netease-youdao/LobsterAI): its IM management, QR binding, agent binding, and customizable agent-profile flows inspired the Claw IM integration in this project.
 - OpenHanako and textide: their Markdown live editing, writing-space, and selection inline-agent patterns heavily informed Write mode.
