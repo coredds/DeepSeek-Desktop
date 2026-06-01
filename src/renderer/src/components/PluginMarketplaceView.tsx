@@ -430,7 +430,7 @@ export function PluginMarketplaceView(): ReactElement {
     await window.dsGui.setDeepseekConfigFile(next)
     setMcpConfigText(next)
     setMcpLoaded(true)
-  }, [mcpConfigText, mcpLoaded, isMcpDisabled])
+  }, [mcpConfigText, mcpLoaded, isMcpDisabled, readMcpConfig])
 
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()

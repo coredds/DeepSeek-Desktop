@@ -42,6 +42,11 @@ export function TerminalCommandPalette({ open, onClose, onRun }: Props): ReactEl
   const sendMessage = useChatStore((s) => s.sendMessage)
   const [npmScripts, setNpmScripts] = useState<Array<{ name: string; command: string }>>([])
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [recentCommands, setRecentCommands] = useState<string[]>([])
+
+  useEffect(() => {
+    if (open) setRecentCommands(loadRecentCommands())
+  }, [open])
 
   useEffect(() => {
     if (!open || !workspaceRoot) return
@@ -69,8 +74,6 @@ export function TerminalCommandPalette({ open, onClose, onRun }: Props): ReactEl
     void load()
     return () => { cancelled = true }
   }, [open, workspaceRoot])
-
-  const recentCommands = useMemo(() => loadRecentCommands(), [open])
 
   const items = useMemo<CommandItem[]>(() => {
     const result: CommandItem[] = []

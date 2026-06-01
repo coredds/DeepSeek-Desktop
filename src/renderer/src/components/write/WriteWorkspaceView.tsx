@@ -393,12 +393,13 @@ export function WriteWorkspaceView({
   const createDraftFile = async (): Promise<void> => {
     if (!workspaceReady) {
       await pickWriteWorkspace()
-      return
     }
-    const root = rootDirectory || workspaceRoot
+    const state = useWriteWorkspaceStore.getState()
+    if (!state.workspaceRoot.trim()) return
+    const root = state.rootDirectory || state.workspaceRoot
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
     const path = writeJoinPath(root, `draft-${stamp}.md`)
-    await createFile(workspaceRoot, path, `# ${t('writeUntitledDraft')}\n\n`)
+    await createFile(state.workspaceRoot, path, `# ${t('writeUntitledDraft')}\n\n`)
   }
 
   const setAssistantPrompt = (prompt: string): void => {

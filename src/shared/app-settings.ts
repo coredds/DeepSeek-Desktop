@@ -228,6 +228,22 @@ export const CLAW_FEISHU_INBOUND_MESSAGE_HEADING = '[Feishu / Lark inbound messa
 const CLAW_SCHEDULE_TOOL_HINT =
   'DeepSeek Desktop scheduled-task tools are available in this Claw runtime. When the user asks to create, list, edit, enable, disable, reschedule, or delete scheduled tasks/reminders, prefer using the schedule tools (`claw_schedule_list`, `claw_schedule_create`, `claw_schedule_update`, `claw_schedule_delete`) instead of only describing steps.'
 
+const DEEPSEEK_DESKTOP_APP_CONTEXT = [
+  'You are running inside DeepSeek Desktop — a local-first desktop application for developers and AI users.',
+  'It wraps the CodeWhale / DeepSeek TUI agent runtime and provides a full GUI with three work modes:',
+  '- Code: work with source files in a project workspace',
+  '- Write: a dedicated Markdown writing workbench',
+  '- Claw: background automation and IM integration',
+  'Users interact with you through this GUI, which provides composer input, streamed responses,',
+  'file review panels, a built-in terminal, settings, and a plugin marketplace.',
+  'DeepSeek Desktop runs locally — no cloud sync, no accounts. Settings persist on the user\'s machine.',
+  'When asked about the application, explain it as DeepSeek Desktop, not CodeWhale.'
+].join(' ')
+
+export function wrapWithAppContext(prompt: string): string {
+  return `${DEEPSEEK_DESKTOP_APP_CONTEXT}\n\n---\n[User request]\n${prompt}`
+}
+
 export function defaultClawImAgentProfile(): ClawImAgentProfileV1 {
   return {
     name: '',
@@ -347,7 +363,7 @@ export function buildClawRuntimePrompt(
   options: { channel?: ClawImChannelV1 | null } = {}
 ): string {
   const skills = settings.claw.skills
-  const instructions: string[] = []
+  const instructions: string[] = [DEEPSEEK_DESKTOP_APP_CONTEXT]
   if (skills.defaultNames.length > 0) {
     instructions.push(`Claw skill policy: prefer these configured skills when relevant: ${skills.defaultNames.join(', ')}.`)
   }

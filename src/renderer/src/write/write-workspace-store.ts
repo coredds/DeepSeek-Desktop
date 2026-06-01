@@ -568,7 +568,7 @@ export const useWriteWorkspaceStore = create<WriteWorkspaceState>((set, get) => 
   openFile: async (workspaceRoot, path) => {
     cancelExternalSyncAnimation()
     const saved = await get().flushSave(workspaceRoot)
-    if (!saved) return
+    if (!saved && !get().fileTruncated) return
     if (!isWriteWorkspaceFilePath(path)) {
       set({
         fileLoading: false,

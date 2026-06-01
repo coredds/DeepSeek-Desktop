@@ -31,6 +31,7 @@ import { workspaceLabelFromPath } from '../lib/workspace-label'
 import { isClawWorkspacePath, isInternalTemporaryWorkspace, normalizeWorkspaceRoot } from '../lib/workspace-path'
 import {
   buildClawRuntimePrompt,
+  wrapWithAppContext,
   type ClawImChannelV1
 } from '@shared/app-settings'
 import type {
@@ -1698,7 +1699,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const channel = get().route === 'claw' ? activeClawChannel(get()) : null
       const runtimeText = channel
         ? buildClawRuntimePrompt(await window.dsGui.getSettings(), trimmedText, { channel })
-        : trimmedText
+        : wrapWithAppContext(trimmedText)
       const { turnId, userMessageItemId } = await p.sendUserMessage(activeThreadId, runtimeText, {
         mode,
         ...(composerModel ? { model: composerModel } : {})
