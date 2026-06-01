@@ -30,7 +30,8 @@ Goal: close gaps with commercial desktops without sacrificing local-first identi
 
 - [ ] **Dev server integration** — auto-detect `npm run dev` success (done: `dev-preview-detection.ts`), preview panel (done: `DevBrowserPanel.tsx`); pending: dev server console output in side panel, HMR event reflection
 - [ ] **PR review workflow** — paste GitHub/GitLab PR URL → checkout branch → send structured diff to agent → surface findings in change inspector
-- [ ] **Plugin/extension system** — define `deepseek-plugin.json` manifest format (MCP servers, skills, shortcuts, slash commands); community plugin registry (GitHub-based); MCP + skill marketplace already exists (`PluginMarketplaceView.tsx`)
+- [ ] **Plugin/extension system** — define `deepseek-plugin.json` manifest format (MCP servers, skills, shortcuts, slash commands); community plugin registry (GitHub-based); marketplace already has prerequisites badges + env config flow (`PluginMarketplaceView.tsx`)
+- [x] **MCP marketplace polish** — prerequisite badges warn users before install, env vars are uncommented with placeholders, "Configure" button opens Settings → MCP editor; added WhatsApp MCP to recommended items
 
 ### Guidelines
 

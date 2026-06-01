@@ -29,6 +29,8 @@ type NoticeTone = 'success' | 'error' | 'info'
 type Notice = {
   tone: NoticeTone
   message: string
+  actionLabel?: string
+  onAction?: () => void
 }
 
 type MarketplaceItem = {
@@ -39,6 +41,7 @@ type MarketplaceItem = {
   group: 'recommended'
   mcpSnippet?: (workspaceRoot: string) => string
   skillInstructions?: string
+  prerequisites?: string[]
 }
 
 type SkillRootOption = {
@@ -164,6 +167,7 @@ const RECOMMENDED_ITEMS: MarketplaceItem[] = [
     titleKey: 'pluginMcpGithubTitle',
     descriptionKey: 'pluginMcpGithubDesc',
     group: 'recommended',
+    prerequisites: ['GITHUB_PERSONAL_ACCESS_TOKEN'],
     mcpSnippet: () =>
       [
         buildMcpSnippet(
@@ -173,7 +177,7 @@ const RECOMMENDED_ITEMS: MarketplaceItem[] = [
           'npx',
           ['-y', '@modelcontextprotocol/server-github']
         ),
-        '# env = { GITHUB_PERSONAL_ACCESS_TOKEN = "ghp_..." }'
+        'env = { GITHUB_PERSONAL_ACCESS_TOKEN = "your-token-here" }'
       ].join('\n')
   },
   {
@@ -182,14 +186,18 @@ const RECOMMENDED_ITEMS: MarketplaceItem[] = [
     titleKey: 'pluginMcpContext7Title',
     descriptionKey: 'pluginMcpContext7Desc',
     group: 'recommended',
+    prerequisites: ['CONTEXT7_API_KEY'],
     mcpSnippet: () =>
-      buildMcpSnippet(
-        'context7',
-        'Context7',
-        'Fetch current library documentation for coding tasks.',
-        'npx',
-        ['-y', '@upstash/context7-mcp@latest']
-      )
+      [
+        buildMcpSnippet(
+          'context7',
+          'Context7',
+          'Fetch current library documentation for coding tasks.',
+          'npx',
+          ['-y', '@upstash/context7-mcp@latest']
+        ),
+        'env = { CONTEXT7_API_KEY = "your-key-here" }'
+      ].join('\n')
   },
   {
     id: 'brave-search',
@@ -197,6 +205,7 @@ const RECOMMENDED_ITEMS: MarketplaceItem[] = [
     titleKey: 'pluginMcpBraveSearchTitle',
     descriptionKey: 'pluginMcpBraveSearchDesc',
     group: 'recommended',
+    prerequisites: ['BRAVE_API_KEY'],
     mcpSnippet: () =>
       [
         buildMcpSnippet(
@@ -206,7 +215,7 @@ const RECOMMENDED_ITEMS: MarketplaceItem[] = [
           'npx',
           ['-y', '@anthropic-ai/mcp-server-brave-search']
         ),
-        '# env = { BRAVE_API_KEY = "..." }'
+        'env = { BRAVE_API_KEY = "your-key-here" }'
       ].join('\n')
   },
   {
@@ -253,6 +262,29 @@ const RECOMMENDED_ITEMS: MarketplaceItem[] = [
         'npx',
         ['-y', '@anthropic-ai/mcp-server-puppeteer']
       )
+  },
+  {
+    id: 'whatsapp',
+    kind: 'mcp',
+    titleKey: 'pluginMcpWhatsappTitle',
+    descriptionKey: 'pluginMcpWhatsappDesc',
+    group: 'recommended',
+    prerequisites: ['Go', 'uv', 'QR auth'],
+    mcpSnippet: () =>
+      [
+        '# Prerequisites: clone the repo and start the Go bridge before use.',
+        '#   git clone https://github.com/lharries/whatsapp-mcp ~/.deepseekdesktop/mcp/whatsapp-mcp',
+        '#   cd ~/.deepseekdesktop/mcp/whatsapp-mcp/whatsapp-bridge && go run main.go',
+        '# Then scan the QR code with WhatsApp to authenticate.',
+        '',
+        buildMcpSnippet(
+          'whatsapp',
+          'WhatsApp',
+          'Search contacts, read chats, send messages via your personal WhatsApp account.',
+          'uv',
+          ['--directory', '~/.deepseekdesktop/mcp/whatsapp-mcp/whatsapp-mcp-server', 'run', 'main.py']
+        )
+      ].join('\n')
   },
   {
     id: 'code-review',
@@ -453,7 +485,7 @@ export function PluginMarketplaceView(): ReactElement {
   const showSplit = filter === 'all'
   const hasAnyInstalled = personalItems.length > 0
 
-  const appendMcpSnippet = async (id: string, snippet: string): Promise<void> => {
+  const appendMcpSnippet = async (id: string, snippet: string, item?: MarketplaceItem): Promise<void> => {
     const content = mcpLoaded ? mcpConfigText : await readMcpConfig()
     if (content.includes(markerFor('mcp', id))) {
       markInstalled(storageKey('mcp', id))
@@ -465,7 +497,16 @@ export function PluginMarketplaceView(): ReactElement {
     setMcpConfigText(next)
     setMcpLoaded(true)
     markInstalled(storageKey('mcp', id))
-    setNotice({ tone: 'success', message: t('pluginMcpAdded', { path: result.path }) })
+    if (item?.prerequisites && item.prerequisites.length > 0) {
+      setNotice({
+        tone: 'success',
+        message: t('pluginMcpAdded', { path: result.path }),
+        actionLabel: t('pluginConfigureEnv'),
+        onAction: () => useChatStore.getState().openSettings('agents')
+      })
+    } else {
+      setNotice({ tone: 'success', message: t('pluginMcpAdded', { path: result.path }) })
+    }
   }
 
   const addItem = async (item: MarketplaceItem): Promise<void> => {
@@ -474,7 +515,7 @@ export function PluginMarketplaceView(): ReactElement {
     try {
       if (item.kind === 'mcp') {
         if (!item.mcpSnippet) return
-        await appendMcpSnippet(item.id, item.mcpSnippet(workspaceRoot))
+        await appendMcpSnippet(item.id, item.mcpSnippet(workspaceRoot), item)
         return
       }
 
@@ -801,6 +842,18 @@ function PluginSection({
                   <p className="mt-1 line-clamp-2 text-[14px] leading-5 text-ds-muted">
                     {t(item.descriptionKey)}
                   </p>
+                  {!installed && item.prerequisites && item.prerequisites.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {item.prerequisites.map((req) => (
+                        <span
+                          key={req}
+                          className="inline-flex items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:bg-amber-500/15 dark:text-amber-400"
+                        >
+                          {req}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -956,8 +1009,17 @@ function NoticeView({ notice }: { notice: Notice }): ReactElement {
         ? 'border-emerald-300/80 bg-emerald-50 text-emerald-800 dark:border-emerald-800/70 dark:bg-emerald-950/25 dark:text-emerald-200'
         : 'border-ds-border bg-ds-subtle text-ds-muted'
   return (
-    <div className={`mt-4 rounded-xl border px-3 py-2 text-[13px] leading-5 ${className}`}>
-      {notice.message}
+    <div className={`mt-4 flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-[13px] leading-5 ${className}`}>
+      <span>{notice.message}</span>
+      {notice.actionLabel && notice.onAction && (
+        <button
+          type="button"
+          onClick={notice.onAction}
+          className="shrink-0 rounded-lg bg-white/60 px-2.5 py-1 text-[12px] font-semibold shadow-sm transition hover:bg-white/80 dark:bg-white/10 dark:hover:bg-white/15"
+        >
+          {notice.actionLabel}
+        </button>
+      )}
     </div>
   )
 }
