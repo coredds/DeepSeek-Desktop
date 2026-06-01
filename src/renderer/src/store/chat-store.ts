@@ -1268,7 +1268,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const activeThreadIsWriteInCodeRoute =
         get().route === 'chat' && activeThreadId != null && isWriteThreadId(activeThreadId, writeRegistry)
       const shouldClearSelection =
-        activeThreadId != null && !displayThreads.some((thread) => thread.id === activeThreadId)
+        activeThreadId != null && !threads.some((thread) => thread.id === activeThreadId)
       if (shouldClearSelection) {
         sseAbort?.abort()
         sseAbort = null

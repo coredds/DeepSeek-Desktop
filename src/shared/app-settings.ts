@@ -221,6 +221,7 @@ export type AppSettingsPatch = Partial<
   claw?: ClawSettingsPatchV1
 }
 
+export const USER_REQUEST_HEADING = '[User request]'
 export const CLAW_CURRENT_USER_REQUEST_HEADING = '[Current user request]'
 export const CLAW_MANAGED_INSTRUCTIONS_HEADING = '[Claw managed instructions]'
 export const CLAW_IM_AGENT_INSTRUCTIONS_HEADING = '[Claw IM agent instructions]'
@@ -241,7 +242,7 @@ const DEEPSEEK_DESKTOP_APP_CONTEXT = [
 ].join(' ')
 
 export function wrapWithAppContext(prompt: string): string {
-  return `${DEEPSEEK_DESKTOP_APP_CONTEXT}\n\n---\n[User request]\n${prompt}`
+  return `${DEEPSEEK_DESKTOP_APP_CONTEXT}\n\n---\n${USER_REQUEST_HEADING}\n${prompt}`
 }
 
 export function defaultClawImAgentProfile(): ClawImAgentProfileV1 {
@@ -381,7 +382,12 @@ export function buildClawRuntimePrompt(
 
 export function unwrapClawRuntimePromptForDisplay(text: string): string {
   const markerIndex = text.lastIndexOf(CLAW_CURRENT_USER_REQUEST_HEADING)
-  if (markerIndex < 0) return text
+  if (markerIndex < 0) {
+    const appWrapSeparator = '\n\n---\n' + USER_REQUEST_HEADING + '\n'
+    const sepIndex = text.indexOf(appWrapSeparator)
+    if (sepIndex < 0) return text
+    return text.slice(sepIndex + appWrapSeparator.length).trimStart()
+  }
   const prefix = text.slice(0, markerIndex)
   const looksManaged =
     prefix.includes(CLAW_MANAGED_INSTRUCTIONS_HEADING) ||

@@ -50,11 +50,13 @@ export function upsertUserBlock(blocks: ChatBlock[], ev: UserMessageEventPayload
   }
   const existingIndex = blocks.findIndex((block) => block.kind === 'user' && block.id === ev.itemId)
   if (existingIndex < 0) return [...blocks, nextBlock]
-  const current = blocks[existingIndex]
+  const existing = blocks[existingIndex]
+  const existingText = existing.kind === 'user' ? existing.text.trim() : ''
   const merged: ChatBlock = {
-    ...current,
+    ...existing,
     ...nextBlock,
-    createdAt: current.createdAt ?? nextBlock.createdAt
+    createdAt: existing.createdAt ?? nextBlock.createdAt,
+    ...(existingText ? { text: existingText } : {})
   }
   const next = [...blocks]
   next[existingIndex] = merged
