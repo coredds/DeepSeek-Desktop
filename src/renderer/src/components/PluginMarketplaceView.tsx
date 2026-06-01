@@ -689,6 +689,18 @@ export function PluginMarketplaceView(): ReactElement {
           isDisabled={activeKind === 'mcp' ? isMcpDisabled : undefined}
           t={t}
         />
+
+        <PluginSection
+          title={t('pluginPersonal')}
+          emptyText={t('pluginPersonalEmpty')}
+          items={personalItems}
+          busyId={busyId}
+          isInstalled={isInstalled}
+          onAdd={addItem}
+          onToggle={activeKind === 'mcp' ? toggleMcpServer : undefined}
+          isDisabled={activeKind === 'mcp' ? isMcpDisabled : undefined}
+          t={t}
+        />
       </div>
     </div>
   )
