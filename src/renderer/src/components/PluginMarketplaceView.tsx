@@ -192,6 +192,69 @@ const RECOMMENDED_ITEMS: MarketplaceItem[] = [
       )
   },
   {
+    id: 'brave-search',
+    kind: 'mcp',
+    titleKey: 'pluginMcpBraveSearchTitle',
+    descriptionKey: 'pluginMcpBraveSearchDesc',
+    group: 'recommended',
+    mcpSnippet: () =>
+      [
+        buildMcpSnippet(
+          'brave-search',
+          'Brave Search',
+          'Web and local search via Brave Search API.',
+          'npx',
+          ['-y', '@anthropic-ai/mcp-server-brave-search']
+        ),
+        '# env = { BRAVE_API_KEY = "..." }'
+      ].join('\n')
+  },
+  {
+    id: 'memory',
+    kind: 'mcp',
+    titleKey: 'pluginMcpMemoryTitle',
+    descriptionKey: 'pluginMcpMemoryDesc',
+    group: 'recommended',
+    mcpSnippet: () =>
+      buildMcpSnippet(
+        'memory',
+        'Memory',
+        'Persistent knowledge graph so the agent remembers across sessions.',
+        'npx',
+        ['-y', '@anthropic-ai/mcp-server-memory']
+      )
+  },
+  {
+    id: 'sequential-thinking',
+    kind: 'mcp',
+    titleKey: 'pluginMcpSequentialThinkingTitle',
+    descriptionKey: 'pluginMcpSequentialThinkingDesc',
+    group: 'recommended',
+    mcpSnippet: () =>
+      buildMcpSnippet(
+        'sequential-thinking',
+        'Sequential Thinking',
+        'Step-by-step reasoning for complex multi-step problems.',
+        'npx',
+        ['-y', '@anthropic-ai/mcp-server-sequential-thinking']
+      )
+  },
+  {
+    id: 'puppeteer',
+    kind: 'mcp',
+    titleKey: 'pluginMcpPuppeteerTitle',
+    descriptionKey: 'pluginMcpPuppeteerDesc',
+    group: 'recommended',
+    mcpSnippet: () =>
+      buildMcpSnippet(
+        'puppeteer',
+        'Puppeteer',
+        'Headless Chrome automation for scraping and screenshots.',
+        'npx',
+        ['-y', '@anthropic-ai/mcp-server-puppeteer']
+      )
+  },
+  {
     id: 'code-review',
     kind: 'skill',
     titleKey: 'pluginSkillReviewTitle',
