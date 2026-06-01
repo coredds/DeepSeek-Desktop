@@ -450,6 +450,9 @@ export function PluginMarketplaceView(): ReactElement {
   const recommendedItems = visibleItems.filter((item) => !isInstalled(item))
   const personalItems = visibleItems.filter(isInstalled)
 
+  const showSplit = filter === 'all'
+  const hasAnyInstalled = personalItems.length > 0
+
   const appendMcpSnippet = async (id: string, snippet: string): Promise<void> => {
     const content = mcpLoaded ? mcpConfigText : await readMcpConfig()
     if (content.includes(markerFor('mcp', id))) {
@@ -678,29 +681,46 @@ export function PluginMarketplaceView(): ReactElement {
 
         {notice ? <NoticeView notice={notice} /> : null}
 
-        <PluginSection
-          title={t('pluginRecommended')}
-          emptyText={t('pluginNoResults')}
-          items={recommendedItems}
-          busyId={busyId}
-          isInstalled={isInstalled}
-          onAdd={addItem}
-          onToggle={activeKind === 'mcp' ? toggleMcpServer : undefined}
-          isDisabled={activeKind === 'mcp' ? isMcpDisabled : undefined}
-          t={t}
-        />
-
-        <PluginSection
-          title={t('pluginPersonal')}
-          emptyText={t('pluginPersonalEmpty')}
-          items={personalItems}
-          busyId={busyId}
-          isInstalled={isInstalled}
-          onAdd={addItem}
-          onToggle={activeKind === 'mcp' ? toggleMcpServer : undefined}
-          isDisabled={activeKind === 'mcp' ? isMcpDisabled : undefined}
-          t={t}
-        />
+        {showSplit ? (
+          <>
+            <PluginSection
+              title={t('pluginRecommended')}
+              emptyText={t('pluginNoResults')}
+              items={recommendedItems}
+              busyId={busyId}
+              isInstalled={isInstalled}
+              onAdd={addItem}
+              onToggle={activeKind === 'mcp' ? toggleMcpServer : undefined}
+              isDisabled={activeKind === 'mcp' ? isMcpDisabled : undefined}
+              t={t}
+            />
+            {hasAnyInstalled ? (
+              <PluginSection
+                title={t('pluginPersonal')}
+                emptyText={t('pluginPersonalEmpty')}
+                items={personalItems}
+                busyId={busyId}
+                isInstalled={isInstalled}
+                onAdd={addItem}
+                onToggle={activeKind === 'mcp' ? toggleMcpServer : undefined}
+                isDisabled={activeKind === 'mcp' ? isMcpDisabled : undefined}
+                t={t}
+              />
+            ) : null}
+          </>
+        ) : (
+          <PluginSection
+            title={filter === 'installed' ? t('pluginPersonal') : t('pluginRecommended')}
+            emptyText={filter === 'installed' ? t('pluginPersonalEmpty') : t('pluginNoResults')}
+            items={filter === 'installed' ? personalItems : recommendedItems}
+            busyId={busyId}
+            isInstalled={isInstalled}
+            onAdd={addItem}
+            onToggle={activeKind === 'mcp' ? toggleMcpServer : undefined}
+            isDisabled={activeKind === 'mcp' ? isMcpDisabled : undefined}
+            t={t}
+          />
+        )}
       </div>
     </div>
   )
