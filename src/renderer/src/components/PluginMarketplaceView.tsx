@@ -7,6 +7,8 @@ import {
   FolderOpen,
   Loader2,
   Plus,
+  Power,
+  PowerOff,
   RefreshCw,
   Search,
   Settings
@@ -327,6 +329,46 @@ export function PluginMarketplaceView(): ReactElement {
     return item.kind === 'mcp' && mcpConfigText.includes(markerFor('mcp', item.id))
   }, [installed, mcpConfigText])
 
+  const isMcpDisabled = useCallback((id: string): boolean => {
+    const marker = markerFor('mcp', id)
+    const idx = mcpConfigText.indexOf(`# ${marker}`)
+    if (idx < 0) return false
+    const sectionStart = mcpConfigText.indexOf('\n', idx)
+    if (sectionStart < 0) return false
+    const nextMarker = mcpConfigText.indexOf('\n# DeepSeek Desktop plugin:', sectionStart + 1)
+    const sectionEnd = nextMarker > 0 ? nextMarker : mcpConfigText.length
+    const section = mcpConfigText.slice(sectionStart, sectionEnd)
+    const lines = section.split('\n').filter((l) => l.trim())
+    return lines.length > 0 && lines.every((l) => l.trimStart().startsWith('#'))
+  }, [mcpConfigText])
+
+  const toggleMcpServer = useCallback(async (id: string): Promise<void> => {
+    const marker = markerFor('mcp', id)
+    const disabled = isMcpDisabled(id)
+    const content = mcpLoaded ? mcpConfigText : await readMcpConfig()
+    const markerIdx = content.indexOf(`# ${marker}`)
+    if (markerIdx < 0) return
+
+    const sectionStart = content.indexOf('\n', markerIdx)
+    if (sectionStart < 0) return
+    const nextMarker = content.indexOf('\n# DeepSeek Desktop plugin:', sectionStart + 1)
+    const sectionEnd = nextMarker > 0 ? nextMarker - 1 : content.length
+    const before = content.slice(0, sectionStart + 1)
+    const section = content.slice(sectionStart + 1, sectionEnd)
+    const after = content.slice(sectionEnd)
+
+    let newSection: string
+    if (disabled) {
+      newSection = section.replace(/^# /gm, '')
+    } else {
+      newSection = section.split('\n').map((l) => l ? `# ${l}` : l).join('\n')
+    }
+    const next = before + newSection + after
+    await window.dsGui.setDeepseekConfigFile(next)
+    setMcpConfigText(next)
+    setMcpLoaded(true)
+  }, [mcpConfigText, mcpLoaded, isMcpDisabled])
+
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
     return RECOMMENDED_ITEMS.filter((item) => item.kind === activeKind)
@@ -580,25 +622,10 @@ export function PluginMarketplaceView(): ReactElement {
           busyId={busyId}
           isInstalled={isInstalled}
           onAdd={addItem}
+          onToggle={activeKind === 'mcp' ? toggleMcpServer : undefined}
+          isDisabled={activeKind === 'mcp' ? isMcpDisabled : undefined}
           t={t}
         />
-
-        <PluginSection
-          title={t('pluginPersonal')}
-          emptyText={t('pluginPersonalEmpty')}
-          items={personalItems}
-          busyId={busyId}
-          isInstalled={isInstalled}
-          onAdd={addItem}
-          t={t}
-        />
-
-        {activeKind === 'mcp' ? (
-          <div className="mt-8 flex items-center gap-2 text-[12px] text-ds-faint">
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span>{t('pluginMcpRestartHint')}</span>
-          </div>
-        ) : null}
       </div>
     </div>
   )
@@ -640,6 +667,8 @@ function PluginSection({
   busyId,
   isInstalled,
   onAdd,
+  onToggle,
+  isDisabled,
   t
 }: {
   title: string
@@ -648,6 +677,8 @@ function PluginSection({
   busyId: string | null
   isInstalled: (item: Pick<MarketplaceItem, 'kind' | 'id'>) => boolean
   onAdd: (item: MarketplaceItem) => Promise<void>
+  onToggle?: (id: string) => Promise<void>
+  isDisabled?: (id: string) => boolean
   t: (key: string, values?: Record<string, unknown>) => string
 }): ReactElement {
   return (
@@ -695,6 +726,25 @@ function PluginSection({
                     <Plus className="h-4 w-4" strokeWidth={2} />
                   )}
                 </button>
+                {installed && item.kind === 'mcp' && onToggle && isDisabled ? (
+                    <button
+                      type="button"
+                      key={`toggle-${itemKey}`}
+                      onClick={() => void onToggle(item.id)}
+                      title={isDisabled(item.id) ? t('pluginMcpEnable') : t('pluginMcpDisable')}
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ${
+                        isDisabled(item.id)
+                          ? 'text-amber-600 hover:bg-amber-500/10 dark:text-amber-400'
+                          : 'text-ds-muted hover:bg-ds-hover hover:text-ds-ink'
+                      }`}
+                    >
+                      {isDisabled(item.id) ? (
+                        <PowerOff className="h-3.5 w-3.5" strokeWidth={2} />
+                      ) : (
+                        <Power className="h-3.5 w-3.5" strokeWidth={2} />
+                      )}
+                    </button>
+                ) : null}
               </div>
             )
           })}
