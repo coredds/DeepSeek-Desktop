@@ -6,13 +6,16 @@ on:
   push:
     branches: [develop, master]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   check:
     name: Typecheck + Lint + Test
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: ['20']
+        node-version: ['20', '24']
 
     steps:
       - name: Checkout
