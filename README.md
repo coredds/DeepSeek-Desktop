@@ -23,10 +23,10 @@ DeepSeek Desktop exposes four modes in the top-left sidebar: **Chat**, **Code**,
 
 ### Chat Mode
 
-The default landing experience: a straightforward chat interface that doesn't require a workspace. Paste images, drag files, or use the paperclip button to attach context.
+The default landing experience: a straightforward chat interface that doesn't require a workspace. Drag files or use the paperclip button to attach context.
 
 - No workspace required — just type and send. Threads stay in your history like any other conversation.
-- Drag and drop images or files onto the composer, paste images from the clipboard, or use the paperclip button to attach files. Images are inlined for multimodal models; other files are referenced in the prompt.
+- Drag and drop files onto the composer or use the paperclip button to attach files. Files are referenced in the prompt.
 - Quick-start cards for explaining topics, writing, coding help, and brainstorming.
 - Plan mode: toggle `/plan` in the composer to sketch steps before executing.
 
@@ -116,7 +116,7 @@ The setup dialog shows progress as the DeepSeek runtime starts, so you can see w
 
 Typical flow (**Chat mode**):
 
-- Type your question or drag in an image — no workspace needed.
+- Type your question — no workspace needed.
 - Use the suggestion cards or type `/` for slash commands (plan mode, compact, fork, archive).
 
 Typical flow (**Code mode**):

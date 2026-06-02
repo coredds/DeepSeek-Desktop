@@ -78,4 +78,8 @@ Types shared between main and renderer. Imported as `@shared/*` (tsconfig paths 
 - **Testing**: Vitest. Test files co-located with source: `*.test.ts`. Run `npm run test`.
 - **No React Router**: Route state is `route: 'chat' | 'write' | 'settings' | 'plugins' | 'claw'` in the Zustand chat store.
 - **localStorage keys**: All prefixed `deepseekdesktop.*`.
+
+## Known limitations
+
+- **Image paste / vision**: The public DeepSeek API (`api.deepseek.com`) does not support image input via chat completions. Inline data URLs cause the model to hallucinate; the `image_url` content block is rejected. The web chat (`chat.deepseek.com`) uses internal file-upload endpoints with session cookies not available to API-key auth. Image paste has been disabled — images are silently dropped from clipboard/drag/file-picker events. `vision:describe` handler returns empty descriptions as a no-op. When image support is added to the public API, re-enable by un-filtering images in `FloatingComposer.handlePaste` / `readFilesAsAttachments` and restoring the `vision:describe` handler.
 - **Data directory**: `~/.deepseekdesktop/` (userData for Electron, plus write workspaces and claw channels).

@@ -78,7 +78,6 @@ import {
 import type { createTerminalService } from '../services/terminal-service'
 import { requestWriteInlineCompletion } from '../services/write-inline-completion-service'
 import { copyWriteDocumentAsRichText, exportWriteDocument } from '../services/write-export-service'
-import { upstreamOpenAiChatCompletionsUrl } from '../../shared/openai-compat-url'
 
 type TerminalService = ReturnType<typeof createTerminalService>
 
@@ -416,54 +415,18 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('vision:describe', async (_, payload: unknown) => {
     const { images } = parseIpcPayload('vision:describe', describeImagesPayloadSchema, payload)
     const settings = await store.load()
-    const apiKey = settings.deepseek.apiKey.trim()
-    const baseUrl = settings.deepseek.baseUrl.trim()
-    if (!apiKey || !settings.deepseek.visionEnabled) {
-      return { descriptions: [] }
-    }
-    const endpoint = upstreamOpenAiChatCompletionsUrl(baseUrl)
-    const descriptions: Array<{ name: string; text: string }> = []
 
-    for (const img of images) {
-      try {
-        const body = JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [{
-            role: 'user',
-            content: [{
-              type: 'image_url',
-              image_url: { url: img.dataUrl, detail: 'auto' }
-            }, {
-              type: 'text',
-              text: 'Describe this image in detail. Include all text, UI elements, code, diagrams, or visual details that would help an AI understand the image\'s contents without seeing it.'
-            }]
-          }],
-          max_tokens: 2000
-        })
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`
-          },
-          body,
-          signal: AbortSignal.timeout(30_000)
-        })
-        if (!res.ok) {
-          const errText = await res.text().catch(() => '')
-          throw new Error(`vision api ${res.status}: ${errText.slice(0, 200)}`)
-        }
-        const data = await res.json() as Record<string, unknown>
-        const choices = data.choices as Array<{ message?: { content?: string } }> | undefined
-        const content = choices?.[0]?.message?.content?.trim()
-        if (content) {
-          descriptions.push({ name: img.name, text: content })
-        }
-      } catch (err) {
-        logError('vision', img.name, err instanceof Error ? err.message : String(err))
-      }
+    if (!settings.deepseek.visionEnabled) {
+      return { descriptions: [], diagnostics: [{ name: '', ok: false, detail: 'vision disabled' }] }
     }
-    return { descriptions }
+    if (!settings.deepseek.apiKey.trim()) {
+      return { descriptions: [], diagnostics: [{ name: '', ok: false, detail: 'no api key' }] }
+    }
+
+    return {
+      descriptions: [],
+      diagnostics: images.map((img) => ({ name: img.name, ok: false, detail: 'vision endpoint unavailable' }))
+    }
   })
 
   ipcMain.handle('claw:status', async (): Promise<ClawRuntimeStatus> =>

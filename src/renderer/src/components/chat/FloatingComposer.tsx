@@ -417,10 +417,13 @@ export function FloatingComposer({
 
   const readFilesAsAttachments = useCallback(
     (files: FileList | File[]): void => {
-      const fileArray = Array.from(files)
+      const nonImageFiles = Array.from(files).filter(
+        (f) => !f.type.startsWith('image/')
+      )
+      if (nonImageFiles.length === 0) return
       const newAttachments: AttachmentItem[] = []
-      let remaining = fileArray.length
-      for (const file of fileArray) {
+      let remaining = nonImageFiles.length
+      for (const file of nonImageFiles) {
         const reader = new FileReader()
         reader.onload = () => {
           newAttachments.push({
@@ -466,20 +469,14 @@ export function FloatingComposer({
     (e: React.ClipboardEvent<HTMLTextAreaElement>): void => {
       const items = e.clipboardData?.items
       if (!items) return
-      const imageFiles: File[] = []
-      for (let i = 0; i < items.length; i += 1) {
-        const item = items[i]
-        if (item.kind === 'file' && item.type.startsWith('image/')) {
-          const file = item.getAsFile()
-          if (file) imageFiles.push(file)
-        }
-      }
-      if (imageFiles.length > 0) {
+      const hasImage = Array.from(items).some(
+        (item) => item.kind === 'file' && item.type.startsWith('image/')
+      )
+      if (hasImage) {
         e.preventDefault()
-        readFilesAsAttachments(imageFiles)
       }
     },
-    [readFilesAsAttachments]
+    []
   )
 
   const handleDragOver = useCallback((e: React.DragEvent): void => {
@@ -630,17 +627,9 @@ export function FloatingComposer({
                 key={att.id}
                 className="group relative flex items-center gap-2 rounded-xl border border-ds-border-muted bg-ds-card/88 px-3 py-2 text-[13px] shadow-sm backdrop-blur"
               >
-                {att.mimeType.startsWith('image/') ? (
-                  <img
-                    src={att.dataUrl}
-                    alt={att.name}
-                    className="h-10 w-10 shrink-0 rounded-lg object-cover"
-                  />
-                ) : (
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-ds-card-muted text-ds-faint">
-                    <Paperclip className="h-4 w-4" strokeWidth={1.8} />
-                  </span>
-                )}
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-ds-card-muted text-ds-faint">
+                  <Paperclip className="h-4 w-4" strokeWidth={1.8} />
+                </span>
                 <span className="max-w-[160px] truncate text-ds-ink">{att.name}</span>
                 <button
                   type="button"

@@ -140,7 +140,10 @@ export type DsGuiApi = {
   setSettings: (partial: AppSettingsPatch) => Promise<AppSettingsV1>
   runtimeRequest: (path: string, method?: string, body?: string) => Promise<RuntimeRequestResult>
   fetchUpstreamModels: () => Promise<UpstreamModelsResult>
-  describeImages: (images: Array<{ name: string; dataUrl: string }>) => Promise<{ descriptions: Array<{ name: string; text: string }> }>
+  describeImages: (images: Array<{ name: string; dataUrl: string }>) => Promise<{
+    descriptions: Array<{ name: string; text: string }>
+    diagnostics: Array<{ name: string; ok: boolean; detail: string }>
+  }>
   getClawStatus: () => Promise<ClawRuntimeStatus>
   runClawTask: (taskId: string) => Promise<ClawRunResult>
   startClawImInstallQr: (

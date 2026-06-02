@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { WRITE_EXPORT_FORMATS } from '../../shared/write-export'
 
 const MAX_BODY_BYTES = 2_000_000
+const MAX_RUNTIME_BODY_BYTES = 10_000_000
 const MAX_IMAGE_DATA_BYTES = 10_000_000
 const MAX_PATH_LENGTH = 4_096
 const MAX_URL_LENGTH = 4_096
@@ -43,7 +44,7 @@ export const runtimeRequestPayloadSchema = z
       value.startsWith('/') ? value : `/${value}`
     ),
     method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional(),
-    body: z.string().max(MAX_BODY_BYTES).optional()
+    body: z.string().max(MAX_RUNTIME_BODY_BYTES).optional()
   })
   .strict()
 

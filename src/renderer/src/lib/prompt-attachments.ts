@@ -2,19 +2,15 @@ import type { AttachmentItem } from '../agent/types'
 
 export type ImageDescription = { name: string; text: string }
 
-const VISION_MAX_DIMENSION = 2048
+const VISION_MAX_DIMENSION = 1024
 const VISION_JPEG_QUALITY = 0.8
 
 export function compressImageForVision(dataUrl: string): Promise<string> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const img = new Image()
     img.onload = () => {
       const { naturalWidth, naturalHeight } = img
       const scale = Math.min(1, VISION_MAX_DIMENSION / Math.max(naturalWidth, naturalHeight))
-      if (scale >= 1) {
-        resolve(dataUrl)
-        return
-      }
       const canvas = document.createElement('canvas')
       canvas.width = Math.round(naturalWidth * scale)
       canvas.height = Math.round(naturalHeight * scale)
@@ -41,7 +37,7 @@ export function buildPromptWithAttachments(
   const imageAtts = attachments.filter((a) => a.mimeType.startsWith('image/'))
   const otherAtts = attachments.filter((a) => !a.mimeType.startsWith('image/'))
 
-  if (imageDescriptions && imageDescriptions.length > 0) {
+  if (imageDescriptions !== undefined) {
     for (const desc of imageDescriptions) {
       parts.push(`[Image: ${desc.name}]\n${desc.text}`)
     }

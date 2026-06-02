@@ -1752,6 +1752,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (!channel && attachments && attachments.length > 0) {
         const imageAtts = attachments.filter((a) => a.mimeType.startsWith('image/'))
         if (imageAtts.length > 0) {
+          let described = false
           try {
             const settings = await window.dsGui.getSettings()
             if (!settings.deepseek.visionEnabled) {
@@ -1767,16 +1768,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 }))
               )
               const result = await window.dsGui.describeImages(compressed)
+              for (const d of result.diagnostics) {
+                console.log(`[vision] ${d.name}: ${d.ok ? 'OK' : 'FAIL'} — ${d.detail}`)
+              }
               if (result.descriptions.length > 0) {
                 console.log(`[vision] got ${result.descriptions.length} description(s)`)
+                for (const desc of result.descriptions) {
+                  console.log(`[vision] description "${desc.name}": ${desc.text.slice(0, 300)}`)
+                }
                 runtimeText = buildPromptWithAttachments(baseText, attachments, result.descriptions)
+                described = true
               } else {
-                console.log('[vision] API returned no descriptions — falling back to base64')
+                console.log('[vision] API returned no descriptions — stripping base64 from prompt')
               }
             }
           } catch (err) {
             console.warn('[vision] preprocessing failed:', err)
-            /* vision preprocessing skipped on error */
+          }
+          if (!described) {
+            runtimeText = buildPromptWithAttachments(baseText, attachments, [])
           }
         }
       }
