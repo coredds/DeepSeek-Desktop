@@ -29,6 +29,8 @@ export type DeepseekSettingsV1 = {
   baseUrl: string
   runtimeToken: string
   extraCorsOrigins: string[]
+  /** When true and apiKey is set, images pasted into chat are auto-described via vision API before sending to the TUI. */
+  visionEnabled: boolean
   /** Forwarded as `--approval-policy` to `deepseek serve`. */
   approvalPolicy: ApprovalPolicy
   /** Forwarded as `--sandbox-mode` to `deepseek serve`. */

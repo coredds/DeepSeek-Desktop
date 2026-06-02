@@ -298,3 +298,17 @@ export const sseStartPayloadSchema = z
   .strict()
 
 export const streamIdSchema = trimmedString(MAX_ID_LENGTH)
+
+export const describeImagesPayloadSchema = z
+  .object({
+    images: z
+      .array(
+        z.object({
+          name: trimmedString(256),
+          dataUrl: trimmedString(MAX_BODY_BYTES)
+        })
+      )
+      .min(1)
+      .max(10)
+  })
+  .strict()

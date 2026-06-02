@@ -164,6 +164,7 @@ const defaultSettings = (): AppSettingsV1 => ({
     baseUrl: DEFAULT_DEEPSEEK_BASE_URL,
     runtimeToken: '',
     extraCorsOrigins: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    visionEnabled: true,
     // `serve --http` defaults to prompting for write tools, but the GUI has no
     // native terminal prompt. Default to auto so GUI turns can send the runtime
     // `auto_approve: true`; users can tighten this from Settings if needed.

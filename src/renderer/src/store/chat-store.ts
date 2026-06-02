@@ -1745,9 +1745,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const baseText = get().route === 'chat-pure'
         ? trimmedText
         : wrapWithAppContext(trimmedText)
-      const runtimeText = channel
+      let runtimeText = channel
         ? buildClawRuntimePrompt(await window.dsGui.getSettings(), trimmedText, { channel })
         : buildPromptWithAttachments(baseText, attachments)
+
+      if (!channel && attachments && attachments.length > 0) {
+        const imageAtts = attachments.filter((a) => a.mimeType.startsWith('image/'))
+        if (imageAtts.length > 0) {
+          try {
+            const settings = await window.dsGui.getSettings()
+            if (settings.deepseek.visionEnabled && settings.deepseek.apiKey.trim()) {
+              const result = await window.dsGui.describeImages(
+                imageAtts.map((a) => ({ name: a.name, dataUrl: a.dataUrl }))
+              )
+              if (result.descriptions.length > 0) {
+                runtimeText = buildPromptWithAttachments(baseText, attachments, result.descriptions)
+              }
+            }
+          } catch {
+            /* vision preprocessing skipped on error */
+          }
+        }
+      }
+
       const { turnId, userMessageItemId } = await p.sendUserMessage(activeThreadId, runtimeText, {
         mode,
         ...(composerModel ? { model: composerModel } : {})

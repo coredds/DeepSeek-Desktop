@@ -1408,6 +1408,16 @@ export function SettingsView(): ReactElement {
                         showLabel={t('showSecret')}
                         hideLabel={t('hideSecret')}
                         className="md:max-w-md"
+                        />
+                    }
+                  />
+                  <SettingRow
+                    title={t('visionProcessing')}
+                    description={t('visionProcessingDesc')}
+                    control={
+                      <Toggle
+                        checked={form.deepseek.visionEnabled}
+                        onChange={(v) => update({ deepseek: { visionEnabled: v } })}
                       />
                     }
                   />

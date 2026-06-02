@@ -27,6 +27,7 @@ function createSettings(patch: Partial<AppSettingsV1['claw']['im']> = {}): AppSe
       baseUrl: 'https://api.deepseek.com/beta',
       runtimeToken: '',
       extraCorsOrigins: [],
+      visionEnabled: true,
       approvalPolicy: 'auto',
       sandboxMode: 'workspace-write'
     },
