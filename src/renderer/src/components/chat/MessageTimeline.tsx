@@ -1033,10 +1033,11 @@ function MessageTurn({
           }
 
           const detailText = block.detail?.trim() ?? ''
-          if (!looksLikeUnifiedDiff(detailText)) return []
+          const hasDetail = detailText.length > 0
+          if (!hasDetail) return []
 
           const resolvedFilePath = formatFilePathForDisplay(
-            extractDiffFilePath(detailText, block.filePath),
+            extractDiffFilePath(detailText, block.filePath) || block.filePath || '',
             workspaceRoot
           )
           if (!resolvedFilePath) return []
@@ -1852,6 +1853,11 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+function isMarkdownFilePath(filePath: string | undefined): boolean {
+  if (!filePath) return false
+  return /\.(md|mdx|markdown)$/i.test(filePath)
+}
+
 function tryParsePlanJson(text: string): PlanData | null {
   if (!text || text.length < 20) return null
   try {
@@ -1975,11 +1981,14 @@ function ProcessEntryDetail({
         </div>
       )
     }
-    return (
-      <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-ds-ink">
-        {detail.text}
-      </pre>
-    )
+    if (isMarkdownFilePath(detail.filePath)) {
+      return (
+        <div className="ds-markdown max-h-80 overflow-auto px-1 py-1 text-[13.5px] leading-6 text-ds-ink">
+          <AssistantMarkdown text={detail.text} streaming={false} />
+        </div>
+      )
+    }
+    return <ToolDetailContent detail={detail.text} />
   }
   if (detail.kind === 'plan') {
     return <PlanCard plan={detail.plan} compact />
@@ -2556,12 +2565,16 @@ function UserInputBubble({
 
       {block.answers && block.answers.length > 0 && block.status === 'submitted' ? (
         <div className="mt-3 rounded-lg bg-ds-card px-3 py-2 text-[12px] text-ds-muted">
-          {block.answers.map((answer) => (
-            <div key={answer.id} className="flex gap-2">
-              <span className="font-mono text-ds-faint">{answer.id}</span>
-              <span className="min-w-0 flex-1 break-words">{answer.value || answer.label}</span>
-            </div>
-          ))}
+          {block.answers.map((answer) => {
+            const question = block.questions.find((q) => q.id === answer.id)
+            const label = question?.header ?? answer.id
+            return (
+              <div key={answer.id} className="flex gap-2">
+                <span className="shrink-0 font-medium text-ds-muted">{label}</span>
+                <span className="min-w-0 flex-1 break-words text-ds-ink">{answer.value || answer.label}</span>
+              </div>
+            )
+          })}
         </div>
       ) : null}
 
@@ -2706,7 +2719,7 @@ function MessageBubble({ block, nested = false }: { block: ChatBlock; nested?: b
   if (block.kind === 'compaction') {
     return (
       <div className="ds-card-soft rounded-[18px] px-3 py-2 text-[13.5px] text-ds-muted">
-        {block.detail || block.summary}
+        {summarizeProcessText(block.detail || block.summary, 140)}
       </div>
     )
   }
@@ -2717,6 +2730,34 @@ function MessageBubble({ block, nested = false }: { block: ChatBlock; nested?: b
   )
 }
 
+function ToolDetailContent({ detail, maxHeight = 320 }: { detail: string; maxHeight?: number }): ReactElement {
+  try {
+    const trimmed = detail.trim()
+    if (trimmed.length < 2 || !(trimmed.startsWith('{') || trimmed.startsWith('['))) {
+      throw new Error('not json')
+    }
+    const parsed = JSON.parse(trimmed)
+    const formatted = JSON.stringify(parsed, null, 2)
+    return (
+      <pre
+        className="max-h-72 overflow-auto whitespace-pre font-mono text-[11.5px] leading-[1.6] text-ds-ink"
+        style={{ maxHeight }}
+      >
+        <code>{formatted}</code>
+      </pre>
+    )
+  } catch {
+    return (
+      <pre
+        className="max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-ds-ink"
+        style={{ maxHeight }}
+      >
+        {detail}
+      </pre>
+    )
+  }
+}
+
 function PlanCard({
   plan,
   compact = false
@@ -2724,6 +2765,7 @@ function PlanCard({
   plan: PlanData
   compact?: boolean
 }): ReactElement {
+  const { t } = useTranslation('common')
   const pending = plan.items.filter((it) => it.status === 'pending').length
   const inProgress = plan.items.filter((it) => it.status === 'in_progress').length
   const completed = plan.items.filter((it) => it.status === 'completed').length
@@ -2741,11 +2783,17 @@ function PlanCard({
   }
 
   const statusLabel = (status: PlanItem['status']): string => {
-    if (status === 'completed') return 'Done'
-    if (status === 'in_progress') return 'In progress'
-    if (status === 'cancelled') return 'Skipped'
-    return 'Pending'
+    if (status === 'completed') return t('planStatusDone')
+    if (status === 'in_progress') return t('planStatusInProgress')
+    if (status === 'cancelled') return t('planStatusSkipped')
+    return t('planStatusPending')
   }
+
+  const headerText = allDone
+    ? t('planHeaderCompleted')
+    : inProgress > 0
+      ? t('planHeaderInProgress')
+      : t('planHeaderCreated')
 
   return (
     <div className={`overflow-hidden rounded-[20px] border border-ds-border bg-ds-subtle shadow-[0_8px_24px_rgba(86,103,136,0.06)] ${compact ? '' : 'mx-0'}`}>
@@ -2755,10 +2803,10 @@ function PlanCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-[13px] font-semibold text-ds-ink">
-            Plan {allDone ? 'completed' : inProgress > 0 ? 'in progress' : 'created'}
+            {headerText}
           </div>
           <div className="mt-0.5 text-[12px] text-ds-muted">
-            {done} of {total} steps done ({pct}%)
+            {t('planProgressSteps', { done, total, pct })}
           </div>
         </div>
       </div>
@@ -2914,10 +2962,12 @@ function ToolEntry({ block, nested = false }: { block: ToolBlock; nested?: boole
         <div className="ds-panel-strip min-w-0 border-t border-ds-border-muted/60 px-4 py-3">
           {isPatch ? (
             <DiffView patch={block.detail!} filePath={block.filePath} />
+          ) : isMarkdownFilePath(block.filePath) ? (
+            <div className="ds-markdown text-[13.5px] leading-6">
+              <AssistantMarkdown text={block.detail!} streaming={false} />
+            </div>
           ) : (
-            <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-ds-ink">
-              {block.detail}
-            </pre>
+            <ToolDetailContent detail={block.detail!} />
           )}
         </div>
       ) : null}

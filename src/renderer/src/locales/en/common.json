@@ -936,5 +936,14 @@
   "workspaceHealthDirtyFiles_one": "1 uncommitted file",
   "workspaceHealthLowDisk": "Low disk space: {{free}} free",
   "workspaceHealthLargeFiles": "{{count}} large files (>100MB)",
-  "workspaceHealthLargeFiles_one": "1 large file (>100MB)"
+  "workspaceHealthLargeFiles_one": "1 large file (>100MB)",
+  "planStatusDone": "Done",
+  "planStatusInProgress": "In progress",
+  "planStatusSkipped": "Skipped",
+  "planStatusPending": "Pending",
+  "planHeaderCompleted": "Plan completed",
+  "planHeaderInProgress": "Plan in progress",
+  "planHeaderCreated": "Plan created",
+  "planProgressSteps": "{{done}} of {{total}} steps done ({{pct}}%)",
+  "toolOutputRaw": "Raw output"
 }

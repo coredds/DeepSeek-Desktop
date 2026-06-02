@@ -6,8 +6,7 @@ import type { ChatBlock, ToolBlock } from '../agent/types'
 import {
   countDiffStats,
   extractDiffFilePath,
-  formatFilePathForDisplay,
-  looksLikeUnifiedDiff
+  formatFilePathForDisplay
 } from '../lib/diff-stats'
 import { useChatStore } from '../store/chat-store'
 import { DiffView } from './DiffView'
@@ -37,14 +36,11 @@ export function ChangeInspector({
       }
 
       const detailText = block.detail?.trim() ?? ''
-      if (!looksLikeUnifiedDiff(detailText)) return []
+      if (!detailText) return []
 
-      return [
-        {
-          ...block,
-          filePath: extractDiffFilePath(detailText, block.filePath)
-        }
-      ]
+      const filePath = extractDiffFilePath(detailText, block.filePath) || block.filePath
+
+      return [{ ...block, filePath }]
     })
   }, [blocks])
 
@@ -150,7 +146,7 @@ export function ChangeInspector({
 
             <div className="ds-panel-strip flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-t border-ds-border-muted">
               {active?.detail ? (
-                <DiffView patch={active.detail} maxHeight={9999} className="h-full min-w-0 rounded-none border-0" />
+                <DiffView patch={active.detail} maxHeight={9999} filePath={active.filePath} className="h-full min-w-0 rounded-none border-0" />
               ) : (
                 <div className="ds-surface-soft flex h-full items-center justify-center border border-dashed border-ds-border-muted px-4 py-6 text-center text-[11px] leading-6 text-ds-muted">
                   {t('inspectorSelectHint')}

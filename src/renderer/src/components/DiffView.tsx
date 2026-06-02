@@ -1,5 +1,7 @@
 import { useMemo, useState, type ReactElement } from 'react'
 import { Check, Copy } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 type Props = {
   patch: string
@@ -76,7 +78,9 @@ export function DiffView({
   filePath
 }: Props): ReactElement {
   const lines = patch.split('\n')
-  const looksLikePatch = lines.some((l) => /^[+-]/.test(l) || l.startsWith('@@'))
+  const isMarkdown = filePath ? /\.(md|mdx|markdown)$/i.test(filePath) : false
+  const hasDiffHeaders = lines.some((l) => l.startsWith('@@') || l.startsWith('--- ') || l.startsWith('+++ ') || l.startsWith('diff --git ') || l.startsWith('index '))
+  const looksLikePatch = isMarkdown ? hasDiffHeaders : lines.some((l) => /^[+-]/.test(l) || l.startsWith('@@'))
   const parsed = useMemo(() => parseDiff(patch, filePath), [patch, filePath])
   const [copied, setCopied] = useState(false)
 
@@ -109,14 +113,25 @@ export function DiffView({
           onCopy={onCopy}
           copied={copied}
         />
-        <pre
-          className={`min-w-0 overflow-auto whitespace-pre p-3 font-mono text-[11.5px] leading-6 text-ds-ink ${
-            fillParent ? 'min-h-0 flex-1' : ''
-          }`}
-          style={fillParent ? undefined : { maxHeight }}
-        >
-          {patch}
-        </pre>
+        {isMarkdown ? (
+          <div
+            className={`min-w-0 overflow-auto p-4 text-[13.5px] leading-[1.65] text-ds-ink ds-markdown ${
+              fillParent ? 'min-h-0 flex-1' : ''
+            }`}
+            style={fillParent ? undefined : { maxHeight }}
+          >
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{patch}</ReactMarkdown>
+          </div>
+        ) : (
+          <pre
+            className={`min-w-0 overflow-auto whitespace-pre p-3 font-mono text-[11.5px] leading-6 text-ds-ink ${
+              fillParent ? 'min-h-0 flex-1' : ''
+            }`}
+            style={fillParent ? undefined : { maxHeight }}
+          >
+            {patch}
+          </pre>
+        )}
       </div>
     )
   }
