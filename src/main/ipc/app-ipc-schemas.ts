@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { WRITE_EXPORT_FORMATS } from '../../shared/write-export'
 
 const MAX_BODY_BYTES = 2_000_000
+const MAX_IMAGE_DATA_BYTES = 10_000_000
 const MAX_PATH_LENGTH = 4_096
 const MAX_URL_LENGTH = 4_096
 const MAX_ID_LENGTH = 256
@@ -305,7 +306,7 @@ export const describeImagesPayloadSchema = z
       .array(
         z.object({
           name: trimmedString(256),
-          dataUrl: trimmedString(MAX_BODY_BYTES)
+          dataUrl: trimmedString(MAX_IMAGE_DATA_BYTES)
         })
       )
       .min(1)

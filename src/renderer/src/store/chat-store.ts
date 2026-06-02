@@ -215,7 +215,7 @@ function notifyTurnComplete(threadId: string | null, state: ChatState, dedupeKey
     })
 }
 
-import { buildPromptWithAttachments } from '../lib/prompt-attachments'
+import { buildPromptWithAttachments, compressImageForVision } from '../lib/prompt-attachments'
 
 /**
  * Compute the patch that finalizes timing for the current in-progress turn.
@@ -1760,9 +1760,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
               console.log('[vision] no API key configured — skipping preprocessing')
             } else {
               console.log(`[vision] describing ${imageAtts.length} image(s)...`)
-              const result = await window.dsGui.describeImages(
-                imageAtts.map((a) => ({ name: a.name, dataUrl: a.dataUrl }))
+              const compressed = await Promise.all(
+                imageAtts.map(async (a) => ({
+                  name: a.name,
+                  dataUrl: await compressImageForVision(a.dataUrl)
+                }))
               )
+              const result = await window.dsGui.describeImages(compressed)
               if (result.descriptions.length > 0) {
                 console.log(`[vision] got ${result.descriptions.length} description(s)`)
                 runtimeText = buildPromptWithAttachments(baseText, attachments, result.descriptions)
