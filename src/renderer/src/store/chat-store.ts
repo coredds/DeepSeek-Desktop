@@ -1754,15 +1754,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
         if (imageAtts.length > 0) {
           try {
             const settings = await window.dsGui.getSettings()
-            if (settings.deepseek.visionEnabled && settings.deepseek.apiKey.trim()) {
+            if (!settings.deepseek.visionEnabled) {
+              console.log('[vision] preprocessing disabled in settings')
+            } else if (!settings.deepseek.apiKey.trim()) {
+              console.log('[vision] no API key configured — skipping preprocessing')
+            } else {
+              console.log(`[vision] describing ${imageAtts.length} image(s)...`)
               const result = await window.dsGui.describeImages(
                 imageAtts.map((a) => ({ name: a.name, dataUrl: a.dataUrl }))
               )
               if (result.descriptions.length > 0) {
+                console.log(`[vision] got ${result.descriptions.length} description(s)`)
                 runtimeText = buildPromptWithAttachments(baseText, attachments, result.descriptions)
+              } else {
+                console.log('[vision] API returned no descriptions — falling back to base64')
               }
             }
-          } catch {
+          } catch (err) {
+            console.warn('[vision] preprocessing failed:', err)
             /* vision preprocessing skipped on error */
           }
         }
