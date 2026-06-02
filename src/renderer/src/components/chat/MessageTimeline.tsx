@@ -1489,7 +1489,7 @@ function ProcessEntryRow({
     (block.kind === 'approval' && block.status === 'error') ||
     (block.kind === 'user_input' && block.status === 'error')
   const open =
-    canExpand && (isAssistantProcessText || isRunningToolOrPending || isStreamingAssistant || userOpen)
+    canExpand && (isAssistantProcessText || isRunningToolOrPending || isStreamingAssistant || detail.kind === 'plan' || userOpen)
 
   const { verb, rest } = splitVerb(summary)
   const rowActive = isRunningToolOrPending || isStreamingAssistant
@@ -1652,9 +1652,21 @@ type ProcessDetail =
   | { kind: 'reasoning'; text: string }
   | { kind: 'assistant'; text: string }
   | { kind: 'tool'; text: string; isPatch: boolean; isError: boolean; filePath?: string }
+  | { kind: 'plan'; plan: PlanData }
   | { kind: 'approval' }
   | { kind: 'user_input' }
   | { kind: 'text'; text: string }
+
+type PlanItem = {
+  step: string
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled'
+  priority?: 'high' | 'medium' | 'low'
+}
+
+type PlanData = {
+  explanation: string
+  items: PlanItem[]
+}
 
 function summarizeProcessText(text: string, max = 96): string {
   const oneLine = text.replace(/\s+/g, ' ').trim()
@@ -1670,8 +1682,88 @@ function humanizeToolName(name: string): string {
 }
 
 function extractToolName(summary: string): string {
-  const match = summary.trim().match(/^([a-z0-9_-]+)\s*:/i)
-  return match?.[1] ?? ''
+  const trimmed = summary.trim()
+  const colonMatch = trimmed.match(/^([a-z0-9_-]+)\s*:/i)
+  if (colonMatch?.[1]) return colonMatch[1]
+  const firstWordMatch = trimmed.match(/^([a-z0-9_-]+)(?:\s|[[{])/i)
+  if (firstWordMatch?.[1]) return firstWordMatch[1]
+  const loneWordMatch = trimmed.match(/^([a-z0-9_-]+)$/i)
+  if (loneWordMatch?.[1] && loneWordMatch[1].length >= 2) return loneWordMatch[1]
+  return ''
+}
+
+function stripJsonFromSummary(summary: string): string {
+  const trimmed = summary.trim()
+  const bracketIdx = Math.min(
+    trimmed.indexOf('[') < 0 ? Infinity : trimmed.indexOf('['),
+    trimmed.indexOf('{') < 0 ? Infinity : trimmed.indexOf('{')
+  )
+  if (bracketIdx === Infinity) return trimmed
+  return trimmed.slice(0, bracketIdx).trim()
+}
+
+function humanizeToolVerb(toolName: string): string {
+  const name = toolName.toLowerCase()
+  const knownVerbs: Record<string, string> = {
+    list_files: 'Browsed',
+    read_file: 'Read',
+    readfile: 'Read',
+    read: 'Read',
+    glob: 'Searched',
+    grep: 'Searched',
+    grep_files: 'Searched',
+    search_files: 'Searched',
+    search: 'Searched',
+    search_content: 'Searched',
+    search_file: 'Searched',
+    find_files: 'Searched',
+    file_search: 'Searched',
+    write_file: 'Wrote',
+    write: 'Wrote',
+    edit_file: 'Edited',
+    edit: 'Edited',
+    edit_replace: 'Edited',
+    delete_file: 'Deleted',
+    delete: 'Deleted',
+    delete_files: 'Deleted',
+    move_file: 'Moved',
+    rename_file: 'Renamed',
+    copy_file: 'Copied',
+    execute_command: 'Ran',
+    exec: 'Ran',
+    bash: 'Ran',
+    sh: 'Ran',
+    run_command: 'Ran',
+    run: 'Ran',
+    todowrite: 'Updated',
+    todo_write: 'Updated',
+    plan_update: 'Updated',
+    update_plan: 'Updated',
+    plan: 'Planned',
+    ask_followup: 'Asked',
+    ask: 'Asked',
+    question: 'Asked',
+    user_input: 'Asked',
+    request_user_input: 'Asked',
+    readdir: 'Browsed',
+    listdir: 'Browsed',
+    ls: 'Browsed',
+    dir: 'Browsed',
+    directory: 'Browsed',
+  }
+  if (knownVerbs[name]) return knownVerbs[name]
+  return humanizeToolName(name)
+}
+
+function cleanToolArgs(args: string): string {
+  const stripped = stripJsonFromSummary(args).trim()
+  if (!stripped) return ''
+  const cleaned = stripped
+    .replace(/^["']|["']$/g, '')
+    .replace(/\\"/g, '"')
+    .trim()
+  if (!cleaned) return ''
+  return cleaned.length > 80 ? `${cleaned.slice(0, 77).trimEnd()}…` : cleaned
 }
 
 function extractQuotedField(text: string, field: string): string | undefined {
@@ -1695,7 +1787,7 @@ function summarizeToolBlock(
 ): string {
   const rawSummary = block.summary?.trim() ?? ''
   const toolName = extractToolName(rawSummary)
-  const label = humanizeToolName(toolName) || formatToolTitle(block, t)
+  const verb = toolName ? humanizeToolVerb(toolName) : formatToolTitle(block, t)
   const sourceText = [rawSummary, block.detail ?? ''].filter(Boolean).join('\n')
   const filePath =
     block.filePath ||
@@ -1708,27 +1800,83 @@ function summarizeToolBlock(
     readMetaString(block.meta, 'pattern')
   const command = readMetaString(block.meta, 'command')
 
-  if (toolName === 'read_file' && filePath) {
-    return `${label} ${filePath}`
+  const isFileRead = /^(read_file|readfile|read|cat)$/i.test(toolName)
+  const isSearch = /^(grep|grep_files|search_files|search|search_content|search_file|glob|find_files|file_search)$/i.test(toolName)
+  const isDirBrowse = /^(list_files|listdir|readdir|ls|dir|directory|list_file|list)$/i.test(toolName)
+
+  if (isFileRead && filePath) {
+    return `${verb} ${filePath}`
   }
-  if ((toolName === 'grep_files' || toolName === 'search_files') && pattern) {
-    return filePath ? `${label} ${pattern} · ${filePath}` : `${label} ${pattern}`
+  if (isDirBrowse && filePath) {
+    return `${verb} ${filePath}`
   }
-  if (command && block.toolKind === 'command_execution') {
-    return `${formatToolTitle(block, t)} ${summarizeProcessText(command, 72)}`
+  if (isDirBrowse && rawSummary) {
+    const args = stripJsonFromSummary(
+      rawSummary.replace(new RegExp(`^${escapeRegex(toolName)}\\s*`, 'i'), '')
+    )
+    const name = extractQuotedField(rawSummary, 'name') || extractQuotedField(rawSummary, 'dir') || extractQuotedField(rawSummary, 'directory')
+    if (name) return `${verb} ${name}`
+    const cleaned = cleanToolArgs(args)
+    if (cleaned) return `${verb} ${cleaned}`
+  }
+  if (isSearch && pattern) {
+    return filePath ? `${verb} "${pattern}" in ${filePath}` : `${verb} "${pattern}"`
+  }
+  if (isSearch && filePath) {
+    return `${verb} ${filePath}`
+  }
+  if (command && (block.toolKind === 'command_execution' || /^(bash|sh|exec|execute_command|run_command|run)$/i.test(toolName))) {
+    return `${verb} ${summarizeProcessText(command, 72)}`
   }
   if (filePath) {
-    return `${label} ${filePath}`
+    return `${verb} ${filePath}`
   }
   if (pattern) {
-    return `${label} ${pattern}`
+    return `${verb} "${pattern}"`
   }
-  if (rawSummary) {
-    const compact = toolName ? rawSummary.replace(/^([a-z0-9_-]+)\s*:\s*/i, '') : rawSummary
-    const summary = summarizeProcessText(compact, 72)
-    return summary ? `${label} ${summary}` : label
+  if (rawSummary && toolName) {
+    const args = stripJsonFromSummary(rawSummary.replace(new RegExp(`^${escapeRegex(toolName)}\\s*:?\\s*`, 'i'), ''))
+    const cleaned = cleanToolArgs(args)
+    if (cleaned) {
+      return `${verb} ${cleaned}`
+    }
   }
-  return label
+  if (rawSummary && !toolName) {
+    const cleaned = stripJsonFromSummary(rawSummary)
+    if (cleaned) return `${verb} ${cleaned}`
+  }
+  return verb
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function tryParsePlanJson(text: string): PlanData | null {
+  if (!text || text.length < 20) return null
+  try {
+    const trimmed = text.trim()
+    if (!trimmed.startsWith('{')) return null
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>
+    if (typeof parsed.explanation !== 'string') return null
+    if (!Array.isArray(parsed.items) || parsed.items.length === 0) return null
+    const items: PlanItem[] = []
+    for (const item of parsed.items) {
+      if (!item || typeof item !== 'object') return null
+      const it = item as Record<string, unknown>
+      if (typeof it.step !== 'string' || !it.step.trim()) return null
+      const status = it.status
+      if (status !== 'pending' && status !== 'in_progress' && status !== 'completed' && status !== 'cancelled') return null
+      items.push({
+        step: it.step,
+        status,
+        priority: typeof it.priority === 'string' && ['high', 'medium', 'low'].includes(it.priority) ? it.priority as 'high' | 'medium' | 'low' : undefined
+      })
+    }
+    return { explanation: parsed.explanation, items }
+  } catch {
+    return null
+  }
 }
 
 function normalizeProcessText(text: string): string {
@@ -1746,6 +1894,8 @@ function getProcessDetail(block: ChatBlock, summaryText?: string): ProcessDetail
   }
   if (block.kind === 'tool') {
     const detailText = block.detail?.trim() ?? ''
+    const plan = detailText ? tryParsePlanJson(detailText) : null
+    if (plan) return { kind: 'plan', plan }
     if (!detailText) return { kind: 'none' }
     if (summaryText && normalizeProcessText(detailText) === normalizeProcessText(summaryText)) {
       return { kind: 'none' }
@@ -1830,6 +1980,9 @@ function ProcessEntryDetail({
         {detail.text}
       </pre>
     )
+  }
+  if (detail.kind === 'plan') {
+    return <PlanCard plan={detail.plan} compact />
   }
   if (detail.kind === 'text') {
     return <p className="whitespace-pre-wrap text-[13.5px] leading-6 text-ds-muted">{detail.text}</p>
@@ -2564,6 +2717,103 @@ function MessageBubble({ block, nested = false }: { block: ChatBlock; nested?: b
   )
 }
 
+function PlanCard({
+  plan,
+  compact = false
+}: {
+  plan: PlanData
+  compact?: boolean
+}): ReactElement {
+  const pending = plan.items.filter((it) => it.status === 'pending').length
+  const inProgress = plan.items.filter((it) => it.status === 'in_progress').length
+  const completed = plan.items.filter((it) => it.status === 'completed').length
+  const cancelled = plan.items.filter((it) => it.status === 'cancelled').length
+  const total = plan.items.length
+  const done = completed + cancelled
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
+  const allDone = done === total
+
+  const statusDot = (status: PlanItem['status']): string => {
+    if (status === 'completed') return 'bg-emerald-500'
+    if (status === 'in_progress') return 'bg-amber-400 animate-pulse'
+    if (status === 'cancelled') return 'bg-ds-faint'
+    return 'bg-ds-border-muted'
+  }
+
+  const statusLabel = (status: PlanItem['status']): string => {
+    if (status === 'completed') return 'Done'
+    if (status === 'in_progress') return 'In progress'
+    if (status === 'cancelled') return 'Skipped'
+    return 'Pending'
+  }
+
+  return (
+    <div className={`overflow-hidden rounded-[20px] border border-ds-border bg-ds-subtle shadow-[0_8px_24px_rgba(86,103,136,0.06)] ${compact ? '' : 'mx-0'}`}>
+      <div className="flex items-center gap-3 border-b border-ds-border-muted/60 px-4 py-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/10">
+          <Check className={`h-4 w-4 ${allDone ? 'text-emerald-500' : 'text-accent'}`} strokeWidth={2} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-semibold text-ds-ink">
+            Plan {allDone ? 'completed' : inProgress > 0 ? 'in progress' : 'created'}
+          </div>
+          <div className="mt-0.5 text-[12px] text-ds-muted">
+            {done} of {total} steps done ({pct}%)
+          </div>
+        </div>
+      </div>
+
+      <div className="px-1 py-1">
+        <div className="mx-2 my-1.5 h-1.5 overflow-hidden rounded-full bg-ds-border-muted/60">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${allDone ? 'bg-emerald-500' : 'bg-accent'}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+
+      {!compact && plan.explanation ? (
+        <div className="border-b border-ds-border-muted/60 px-4 py-2 text-[12.5px] leading-[1.55] text-ds-muted">
+          {plan.explanation}
+        </div>
+      ) : null}
+
+      <div className="divide-y divide-ds-border-muted/40">
+        {plan.items.map((item, idx) => (
+          <div
+            key={idx}
+            className={`flex items-start gap-2.5 px-4 py-2.5 text-[13px] leading-[1.5] ${
+              item.status === 'in_progress'
+                ? 'bg-amber-50/60 dark:bg-amber-950/15'
+                : item.status === 'completed'
+                  ? 'bg-emerald-50/40 dark:bg-emerald-950/10'
+                  : ''
+            }`}
+          >
+            <span
+              className={`mt-[5px] h-2 w-2 shrink-0 rounded-full ${statusDot(item.status)}`}
+            />
+            <span
+              className={`flex-1 ${
+                item.status === 'completed' || item.status === 'cancelled'
+                  ? 'line-through opacity-60'
+                  : item.status === 'in_progress'
+                    ? 'font-medium text-ds-ink'
+                    : 'text-ds-muted'
+              }`}
+            >
+              {item.step}
+            </span>
+            <span className="mt-px shrink-0 text-[10.5px] font-medium uppercase tracking-wider text-ds-faint">
+              {statusLabel(item.status)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function ToolEntry({ block, nested = false }: { block: ToolBlock; nested?: boolean }): ReactElement {
   const { t } = useTranslation('common')
   const [open, setOpen] = useState(() => block.status === 'error' || block.status === 'running')
@@ -2595,8 +2845,18 @@ function ToolEntry({ block, nested = false }: { block: ToolBlock; nested?: boole
   const durationMs = readNumber(block.meta, 'duration_ms')
 
   const hasDetail = !!(block.detail && block.detail.trim().length > 0)
+  const plan = hasDetail ? tryParsePlanJson(block.detail!) : null
+
   const isPatch = block.toolKind === 'file_change' && hasDetail
   const canExpand = hasDetail || block.status === 'running'
+
+  if (plan) {
+    return (
+      <div className={nested ? '' : 'mx-0 mt-3'}>
+        <PlanCard plan={plan} />
+      </div>
+    )
+  }
 
   return (
     <div className={`rounded-[22px] border shadow-[0_12px_30px_rgba(86,103,136,0.04)] ${tone}`}>
@@ -2639,10 +2899,7 @@ function ToolEntry({ block, nested = false }: { block: ToolBlock; nested?: boole
             ) : null}
           </div>
           <div className="mt-0.5 break-words">
-            {block.filePath ? (
-              <span className="font-mono text-[12px] opacity-90">{block.filePath} — </span>
-            ) : null}
-            <span>{block.summary}</span>
+            <span>{summarizeToolBlock(block, t)}</span>
           </div>
         </div>
         {canExpand ? (
