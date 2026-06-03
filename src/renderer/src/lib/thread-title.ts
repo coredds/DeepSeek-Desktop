@@ -35,17 +35,21 @@ export function getDefaultThreadTitle(): string {
 
 export function deriveThreadTitleFromPrompt(prompt: string): string {
   const fallback = getDefaultThreadTitle()
-  const lines = prompt
-    .split(/\r?\n/)
+  const rawLines = prompt.split(/\r?\n/)
+  const lines = rawLines
     .filter((line) => !/^\s*(```|~~~)/.test(line))
     .map((line) => normalizeTitleLine(line))
-    .filter((line) => line)
+    .filter((line) => line.length >= 3)
 
-  const firstLine = lines[0] ?? normalizeTitleLine(prompt)
-  if (!firstLine) return fallback
+  const firstGoodLine = lines[0] ?? normalizeTitleLine(prompt)
+  if (!firstGoodLine) return fallback
 
-  const sentenceBreak = firstLine.search(/[.!?]/)
-  const core = sentenceBreak >= 8 ? firstLine.slice(0, sentenceBreak) : firstLine
+  const breakMatch = firstGoodLine.match(/[.!?](?=\s|$)/)
+  const sentenceBreak = breakMatch ? breakMatch.index! : -1
+  const core =
+    sentenceBreak >= 8
+      ? firstGoodLine.slice(0, sentenceBreak)
+      : firstGoodLine
   const trimmed = stripTrailingPunctuation(shortenTitle(core))
   return trimmed || fallback
 }

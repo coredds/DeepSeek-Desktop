@@ -1860,18 +1860,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
           })
         }
       }
-      if (shouldRenameThreadAfterSend) {
-        const renamed = await p.renameThread(activeThreadId, generatedTitle).then(() => true).catch(() => {
-          /* keep message delivery successful even if auto-title update fails */
-          return false
+      if (shouldRenameThreadAfterSend && generatedTitle !== activeThread?.title) {
+        set((s) => ({
+          threads: s.threads.map((thread) =>
+            thread.id === activeThreadId ? { ...thread, title: generatedTitle } : thread
+          )
+        }))
+        void p.renameThread(activeThreadId, generatedTitle).catch(() => {
+          /* optimistic; refreshThreads below restores correct title on failure */
         })
-        if (renamed) {
-          set((s) => ({
-            threads: s.threads.map((thread) =>
-              thread.id === activeThreadId ? { ...thread, title: generatedTitle } : thread
-            )
-          }))
-        }
       }
       set({ currentTurnId: turnId })
       const ac = sseAbort = new AbortController()
