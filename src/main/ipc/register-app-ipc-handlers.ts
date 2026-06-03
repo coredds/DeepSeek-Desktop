@@ -49,7 +49,8 @@ import {
   writeRichClipboardPayloadSchema,
   writeInlineCompletionPayloadSchema,
   workspaceRootSchema,
-  describeImagesPayloadSchema
+  describeImagesPayloadSchema,
+  exportMarkdownPayloadSchema
 } from './app-ipc-schemas'
 import type { JsonSettingsStore } from '../settings-store'
 import { getRuntimeBaseUrl } from '../settings-store'
@@ -797,6 +798,35 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       parseIpcPayload('notification:turn-complete', notificationPayloadSchema, payload)
     )
   )
+  ipcMain.handle(
+    'export:save-markdown',
+    async (_, payload: unknown) => {
+      const request = parseIpcPayload('export:save-markdown', exportMarkdownPayloadSchema, payload)
+      const mainWindow = getMainWindow()
+      const result = mainWindow
+        ? await dialog.showSaveDialog(mainWindow, {
+            title: 'Export conversation as Markdown',
+            defaultPath: request.defaultName,
+            filters: [{ name: 'Markdown', extensions: ['md'] }]
+          })
+        : await dialog.showSaveDialog({
+            title: 'Export conversation as Markdown',
+            defaultPath: request.defaultName,
+            filters: [{ name: 'Markdown', extensions: ['md'] }]
+          })
+      if (result.canceled || !result.filePath) {
+        return { ok: false as const, message: 'Cancelled' }
+      }
+      try {
+        await writeFile(result.filePath, request.content, 'utf8')
+        return { ok: true as const, path: result.filePath }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        return { ok: false as const, message }
+      }
+    }
+  )
+
   ipcMain.handle('app:version', async () => getAppVersion())
   ipcMain.handle('log:error', async (_, payload: unknown) => {
     const request = parseIpcPayload('log:error', logErrorPayloadSchema, payload)

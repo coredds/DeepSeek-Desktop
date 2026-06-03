@@ -123,6 +123,10 @@ export type ClawImInstallQrResult =
 export type ClawImInstallPollResult =
   | { done: true; kind: 'feishu'; appId: string; appSecret: string; domain: string }
   | { done: false; error?: string }
+export type ExportMarkdownResult =
+  | { ok: true; path: string }
+  | { ok: false; message: string }
+
 export type DeepseekSpawnResult = {
   started: boolean
   healthy: boolean
@@ -226,6 +230,7 @@ export type DsGuiApi = {
   showTurnCompleteNotification: (
     payload: TurnCompleteNotificationPayload
   ) => Promise<SystemNotificationResult>
+  saveExportMarkdown: (content: string, defaultName: string) => Promise<ExportMarkdownResult>
   getAppVersion: () => Promise<string>
   logError: (category: string, message: string, detail?: unknown) => Promise<void>
   getLogPath: () => Promise<string>

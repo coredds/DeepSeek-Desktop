@@ -85,16 +85,22 @@ function AssistantMarkdown({
   streaming,
   className
 }: AssistantMarkdownProps): ReactElement {
+  const showCursor = streaming && text.trim().length > 0
   return (
-    <Suspense
-      fallback={
-        <div className={className}>
-          {text}
-        </div>
-      }
-    >
-      <LazyStreamdownAssistant text={text} streaming={streaming} className={className} />
-    </Suspense>
+    <>
+      <Suspense
+        fallback={
+          <div className={className}>
+            {text}
+          </div>
+        }
+      >
+        <LazyStreamdownAssistant text={text} streaming={streaming} className={className} />
+      </Suspense>
+      {showCursor ? (
+        <span className="ml-px inline-block h-[1.1em] w-[2px] animate-pulse rounded-sm bg-accent align-[-0.1em]" />
+      ) : null}
+    </>
   )
 }
 

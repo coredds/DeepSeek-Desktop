@@ -38,6 +38,7 @@ import type {
   AppRoute,
   ChatState,
   InitialSetupMode,
+  MessageSearchResult,
   PluginHostRoute,
   QueuedUserMessage,
   SendMessageOverrides,
@@ -103,8 +104,33 @@ const sseAbortRef = {
 }
 let composerModelLoadPromise: Promise<void> | null = null
 let bootPromise: Promise<void> | null = null
-const BUSY_WATCHDOG_MS = 180_000
-const MAX_BUSY_RECOVERY_ATTEMPTS = 3
+
+function getBlockSearchableText(block: ChatBlock): string {
+  if (block.kind === 'user' || block.kind === 'assistant' || block.kind === 'reasoning' || block.kind === 'system') {
+    return block.text
+  }
+  if (block.kind === 'tool') {
+    return [block.summary, block.detail].filter(Boolean).join('\n')
+  }
+  return ''
+}
+
+function extractSnippet(
+  text: string,
+  matchIndex: number,
+  matchLength: number,
+  contextLen: number
+): string {
+  const start = Math.max(0, matchIndex - Math.floor(contextLen / 2))
+  const end = Math.min(text.length, matchIndex + matchLength + Math.ceil(contextLen / 2))
+  let snippet = text.slice(start, end)
+  if (start > 0) snippet = `\u2026${snippet}`
+  if (end < text.length) snippet = `${snippet}\u2026`
+  return snippet
+}
+
+const BUSY_WATCHDOG_MS = 300_000
+const MAX_BUSY_RECOVERY_ATTEMPTS = 5
 const MAX_RUNTIME_EVENT_TIMER_AGE_MS = 30 * 60_000
 const CLOCK_SKEW_TOLERANCE_MS = 5_000
 let drainingQueuedMessages = false
@@ -765,6 +791,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   queuedMessages: [],
   watchTurnCompletion: {},
   unreadThreadIds: {},
+  messageSearchQuery: '',
+  messageSearchResults: [],
+  isSearchingMessages: false,
   clawChannels: [],
   activeClawChannelId: '',
 
@@ -1352,6 +1381,83 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ showArchivedThreads: show })
     if (show && get().runtimeConnection === 'ready') {
       void get().refreshThreads()
+    }
+  },
+
+  setMessageSearchQuery: (query) => {
+    set({ messageSearchQuery: query })
+  },
+
+  clearMessageSearch: () => {
+    set({ messageSearchQuery: '', messageSearchResults: [], isSearchingMessages: false })
+  },
+
+  searchMessages: async (query) => {
+    const trimmed = query.trim()
+    if (trimmed.length < 2) {
+      set({ messageSearchResults: [], isSearchingMessages: false })
+      return
+    }
+
+    const { providerId, threads } = get()
+    if (threads.length === 0) {
+      set({ messageSearchResults: [], isSearchingMessages: false })
+      return
+    }
+
+    set({ isSearchingMessages: true })
+
+    try {
+      const p = getProvider(providerId)
+      const lowerQuery = trimmed.toLowerCase()
+      const results: MessageSearchResult[] = []
+      const BATCH_SIZE = 5
+      const seenBlockIds = new Set<string>()
+
+      for (let i = 0; i < threads.length; i += BATCH_SIZE) {
+        const batch = threads.slice(i, i + BATCH_SIZE)
+        const details = await Promise.allSettled(
+          batch.map((th) => p.getThreadDetail(th.id))
+        )
+
+        for (let j = 0; j < details.length; j++) {
+          const detail = details[j]
+          if (detail.status !== 'fulfilled') continue
+          const thread = batch[j]
+          const { blocks } = detail.value
+
+          for (const block of blocks) {
+            const text = getBlockSearchableText(block)
+            if (!text) continue
+            const matchIndex = text.toLowerCase().indexOf(lowerQuery)
+            if (matchIndex === -1) continue
+
+            const dedupeKey = `${thread.id}\0${block.id}`
+            if (seenBlockIds.has(dedupeKey)) continue
+            seenBlockIds.add(dedupeKey)
+
+            const snippet = extractSnippet(text, matchIndex, lowerQuery.length, 120)
+            results.push({
+              threadId: thread.id,
+              threadTitle: thread.title || '',
+              blockId: block.id,
+              blockKind: block.kind,
+              text: snippet,
+              matchIndex
+            })
+          }
+        }
+
+        if (get().messageSearchQuery.trim() !== trimmed) break
+
+        if (results.length >= 30) break
+      }
+
+      if (get().messageSearchQuery.trim() === trimmed) {
+        set({ messageSearchResults: results, isSearchingMessages: false })
+      }
+    } catch {
+      set({ isSearchingMessages: false })
     }
   },
 

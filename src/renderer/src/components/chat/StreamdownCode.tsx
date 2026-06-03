@@ -167,13 +167,20 @@ function CodeBlock({
   const [expanded, setExpanded] = useState(false)
   const bodyRef = useRef<HTMLDivElement>(null)
   const copyResetRef = useRef<number | null>(null)
+  const lastHighlightedRef = useRef<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    setHtml(renderFallbackCodeHtml(trimmedCode))
+
+    if (!lastHighlightedRef.current) {
+      setHtml(renderFallbackCodeHtml(trimmedCode))
+    }
 
     void highlightCodeHtml(trimmedCode, language).then((nextHtml) => {
-      if (!cancelled) setHtml(nextHtml)
+      if (!cancelled) {
+        lastHighlightedRef.current = nextHtml
+        setHtml(nextHtml)
+      }
     })
 
     return () => {

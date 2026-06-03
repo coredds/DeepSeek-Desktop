@@ -32,6 +32,15 @@ export type SendMessageOverrides = {
 
 export type InitialSetupMode = 'required' | 'preview'
 export type SettingsRouteSection = 'general' | 'write' | 'agents' | 'skill' | 'mcp' | 'claw'
+export type MessageSearchResult = {
+  threadId: string
+  threadTitle: string
+  blockId: string
+  blockKind: string
+  text: string
+  matchIndex: number
+}
+
 export type AppRoute = 'chat' | 'chat-pure' | 'write' | 'settings' | 'plugins' | 'claw'
 export type PluginHostRoute = 'chat' | 'chat-pure' | 'claw'
 
@@ -69,6 +78,9 @@ export type ChatState = {
   queuedMessages: QueuedUserMessage[]
   watchTurnCompletion: Record<string, boolean>
   unreadThreadIds: Record<string, boolean>
+  messageSearchQuery: string
+  messageSearchResults: MessageSearchResult[]
+  isSearchingMessages: boolean
   clawChannels: ClawImChannelV1[]
   activeClawChannelId: string
   appendLocalClawTurn: (userText: string, replyText: string) => void
@@ -113,6 +125,9 @@ export type ChatState = {
   refreshThreads: () => Promise<void>
   setThreadSearch: (query: string) => void
   setShowArchivedThreads: (show: boolean) => void
+  setMessageSearchQuery: (query: string) => void
+  searchMessages: (query: string) => Promise<void>
+  clearMessageSearch: () => void
   createThread: (options?: { workspaceRoot?: string }) => Promise<void>
   selectThread: (id: string) => Promise<void>
   recoverActiveTurn: () => Promise<boolean>

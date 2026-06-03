@@ -161,6 +161,8 @@ const api = {
   focusWindow: () => ipcRenderer.invoke('window:focus'),
   openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
   showTurnCompleteNotification: (payload) => ipcRenderer.invoke('notification:turn-complete', payload),
+  saveExportMarkdown: (content, defaultName) =>
+    ipcRenderer.invoke('export:save-markdown', { content, defaultName }),
   getAppVersion: () => ipcRenderer.invoke('app:version'),
   logError: (category, message, detail) =>
     ipcRenderer.invoke('log:error', { category, message, detail }),

@@ -301,6 +301,13 @@ export const sseStartPayloadSchema = z
 
 export const streamIdSchema = trimmedString(MAX_ID_LENGTH)
 
+export const exportMarkdownPayloadSchema = z
+  .object({
+    content: z.string().min(1).max(5_000_000),
+    defaultName: z.string().trim().min(1).max(256)
+  })
+  .strict()
+
 export const describeImagesPayloadSchema = z
   .object({
     images: z

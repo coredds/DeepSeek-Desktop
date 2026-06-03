@@ -14,6 +14,7 @@ import {
   Plus,
   RotateCcw,
   Search,
+  TextSearch,
   Trash2,
   X
 } from 'lucide-react'
@@ -21,6 +22,7 @@ import type { NormalizedThread } from '../../agent/types'
 import { formatRelativeTime } from '../../lib/format-relative-time'
 import { workspaceLabelFromPath } from '../../lib/workspace-label'
 import { isClawWorkspacePath, isInternalTemporaryWorkspace, normalizeWorkspaceRoot } from '../../lib/workspace-path'
+import { MessageSearchPanel } from './MessageSearchPanel'
 
 type SidebarProjectsSectionProps = {
   threads: NormalizedThread[]
@@ -70,6 +72,7 @@ export function SidebarProjectsSection({
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<Record<string, boolean>>({})
   const [deletingThreadIds, setDeletingThreadIds] = useState<Record<string, boolean>>({})
+  const [messageSearchMode, setMessageSearchMode] = useState(false)
 
   const groups = useMemo(() => {
     const map = new Map<string, NormalizedThread[]>()
@@ -173,10 +176,24 @@ export function SidebarProjectsSection({
     <div className="ds-no-drag flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between px-2 pb-1 pt-0.5">
         <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ds-faint">
-          {headingLabel}
+          {messageSearchMode ? t('messageSearchTitle') : headingLabel}
         </span>
         <div className="flex items-center gap-0.5">
-          {headingWorkspaceAction ? (
+          <button
+            type="button"
+            onClick={() => setMessageSearchMode((v) => !v)}
+            className={`rounded-md p-1 transition ${
+              messageSearchMode
+                ? 'bg-accent-soft text-accent'
+                : 'text-ds-faint hover:bg-ds-hover/70 hover:text-ds-ink'
+            }`}
+            title={t('messageSearchToggle')}
+            aria-label={t('messageSearchToggle')}
+            aria-pressed={messageSearchMode}
+          >
+            <TextSearch className="h-3.5 w-3.5" strokeWidth={1.75} />
+          </button>
+          {headingWorkspaceAction && !messageSearchMode ? (
             <button
               type="button"
               onClick={onPickWorkspace}
@@ -189,6 +206,16 @@ export function SidebarProjectsSection({
         </div>
       </div>
 
+      {messageSearchMode ? (
+        <MessageSearchPanel
+          onClose={() => setMessageSearchMode(false)}
+          onNavigate={(threadId) => {
+            setMessageSearchMode(false)
+            onSelectThread(threadId)
+          }}
+        />
+      ) : (
+        <>
       <div className="mb-2 flex items-center gap-1 px-1">
         <label className="relative min-w-0 flex-1">
           <Search
@@ -404,6 +431,8 @@ export function SidebarProjectsSection({
           })
         )}
       </div>
+        </>
+      )}
     </div>
   )
 }

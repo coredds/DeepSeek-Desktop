@@ -1,11 +1,12 @@
 import type { ReactElement } from 'react'
 import { useEffect, useState } from 'react'
-import { GitFork, MessageSquare, Minimize2 } from 'lucide-react'
+import { Download, GitFork, MessageSquare, Minimize2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useChatStore } from '../store/chat-store'
 import { formatRelativeTime } from '../lib/format-relative-time'
 import { workspaceLabelFromPath } from '../lib/workspace-label'
 import { formatCompactNumber, formatCost, formatPercent, useThreadUsage } from '../hooks/use-thread-usage'
+import { blocksToMarkdown, defaultExportFilename } from '../lib/export-markdown'
 
 type Props = {
   compact?: boolean
@@ -19,6 +20,7 @@ export function SessionHeader({ compact = false, className = '' }: Props): React
   const busy = useChatStore((s) => s.busy)
   const runtimeConnection = useChatStore((s) => s.runtimeConnection)
   const workspaceLabel = useChatStore((s) => s.workspaceLabel)
+  const blocks = useChatStore((s) => s.blocks)
   const renameActiveThread = useChatStore((s) => s.renameActiveThread)
   const compactActiveThread = useChatStore((s) => s.compactActiveThread)
   const forkActiveThread = useChatStore((s) => s.forkActiveThread)
@@ -42,6 +44,14 @@ export function SessionHeader({ compact = false, className = '' }: Props): React
         ? t('sessionForkedFrom', { title: forkedFromTitle })
         : t('sessionForked')
       : ''
+
+  const handleExport = (): void => {
+    if (!active || blocks.length === 0) return
+    const title = active.title || 'conversation'
+    const markdown = blocksToMarkdown(blocks, title)
+    const filename = defaultExportFilename(title)
+    void window.dsGui?.saveExportMarkdown(markdown, filename)
+  }
 
   useEffect(() => {
     if (active) {
@@ -134,6 +144,16 @@ export function SessionHeader({ compact = false, className = '' }: Props): React
         )}
         {active ? (
           <div className="ml-auto flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={() => handleExport()}
+              disabled={blocks.length === 0}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-35"
+              title={t('exportMarkdown')}
+              aria-label={t('exportMarkdown')}
+            >
+              <Download className="h-3.5 w-3.5" strokeWidth={1.9} />
+            </button>
             <button
               type="button"
               onClick={() => void compactActiveThread()}
@@ -259,11 +279,24 @@ export function SessionHeader({ compact = false, className = '' }: Props): React
           <div className="mt-1 text-[13.5px] text-ds-faint">{t('sessionHeaderHint')}</div>
         </div>
       )}
-      {busy ? (
-        <span className="ml-auto shrink-0 rounded-full bg-amber-500/18 px-3 py-1.5 text-[12.5px] font-semibold text-amber-950 dark:text-amber-100">
-          {t('running')}
-        </span>
-      ) : null}
+      <div className="ml-auto flex shrink-0 items-center gap-1">
+        {active && blocks.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => handleExport()}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink"
+            title={t('exportMarkdown')}
+            aria-label={t('exportMarkdown')}
+          >
+            <Download className="h-4 w-4" strokeWidth={1.9} />
+          </button>
+        ) : null}
+        {busy ? (
+          <span className="shrink-0 rounded-full bg-amber-500/18 px-3 py-1.5 text-[12.5px] font-semibold text-amber-950 dark:text-amber-100">
+            {t('running')}
+          </span>
+        ) : null}
+      </div>
     </div>
   )
 }
