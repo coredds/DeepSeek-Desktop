@@ -221,6 +221,7 @@ export type DsGuiApi = {
     text: string,
     options?: { channelId?: string; modelHint?: string; mode?: 'agent' | 'plan' }
   ) => Promise<ClawTaskFromTextResult>
+  focusWindow: () => Promise<void>
   openExternal: (url: string) => Promise<void>
   showTurnCompleteNotification: (
     payload: TurnCompleteNotificationPayload

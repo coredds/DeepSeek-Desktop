@@ -930,7 +930,9 @@ export function RuntimeInsightsPanel({ className = '', onCollapse }: Props): Rea
                     <IconButton
                       label={t('runtimePanelDelete')}
                       onClick={() => {
-                        if (window.confirm(t('runtimePanelDeleteConfirm'))) {
+                        const confirmed = window.confirm(t('runtimePanelDeleteConfirm'))
+                        void window.dsGui.focusWindow()
+                        if (confirmed) {
                           void automationAction(automation.id, 'delete')
                         }
                       }}
@@ -1129,9 +1131,11 @@ export function RuntimeInsightsPanel({ className = '', onCollapse }: Props): Rea
                   />
                   <IconButton
                     label={t('runtimePanelDelete')}
-                    onClick={() => {
-                      if (window.confirm(t('runtimePanelDeleteConfirm'))) void deleteSession(id)
-                    }}
+                      onClick={() => {
+                        const confirmed = window.confirm(t('runtimePanelDeleteConfirm'))
+                        void window.dsGui.focusWindow()
+                        if (confirmed) void deleteSession(id)
+                      }}
                     icon={<Trash2 className="h-3.5 w-3.5" strokeWidth={1.9} />}
                     danger
                   />

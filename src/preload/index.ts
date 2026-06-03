@@ -158,6 +158,7 @@ const api = {
       modelHint: options?.modelHint,
       mode: options?.mode
     }),
+  focusWindow: () => ipcRenderer.invoke('window:focus'),
   openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
   showTurnCompleteNotification: (payload) => ipcRenderer.invoke('notification:turn-complete', payload),
   getAppVersion: () => ipcRenderer.invoke('app:version'),

@@ -815,4 +815,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     if (error) return { ok: false, message: error }
     return { ok: true }
   })
+  ipcMain.handle('window:focus', async () => {
+    getMainWindow()?.focus()
+  })
 }

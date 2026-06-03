@@ -219,7 +219,8 @@ export function WriteSidebar({
 
   const removeWorkspaceFromList = async (workspacePath: string): Promise<void> => {
     if (workspaceRoots.length <= 1) return
-    if (!window.confirm(t('writeRemoveWorkspaceConfirm', { name: writeBasenameFromPath(workspacePath) }))) return
+    if (!window.confirm(t('writeRemoveWorkspaceConfirm', { name: writeBasenameFromPath(workspacePath) }))) { void window.dsGui.focusWindow(); return }
+    void window.dsGui.focusWindow()
     await removeWriteWorkspace(workspacePath)
   }
 

@@ -109,7 +109,8 @@ export function SidebarProjectsSection({
     const threadId = thread.id.trim()
     if (!threadId || deletingThreadIds[threadId]) return
     const confirmMessage = t('sidebarThreadArchiveConfirm', { title: thread.title })
-    if (!window.confirm(confirmMessage)) return
+    if (!window.confirm(confirmMessage)) { void window.dsGui.focusWindow(); return }
+    void window.dsGui.focusWindow()
     setDeletingThreadIds((prev) => ({ ...prev, [threadId]: true }))
     try {
       await onDeleteThread(threadId)
@@ -139,7 +140,8 @@ export function SidebarProjectsSection({
 
   const handleRemoveWorkspace = async (workspacePath: string): Promise<void> => {
     const confirmMessage = t('sidebarWorkspaceRemoveConfirm', { path: workspacePath })
-    if (!window.confirm(confirmMessage)) return
+    if (!window.confirm(confirmMessage)) { void window.dsGui.focusWindow(); return }
+    void window.dsGui.focusWindow()
     await onRemoveWorkspace(workspacePath)
   }
 

@@ -495,7 +495,8 @@ export function ClawAddImDialog({
   const handleDeleteChannel = async (channel: ClawImChannelV1): Promise<void> => {
     if (busy || typeof onDeleteChannel !== 'function') return
     const confirmMessage = t('clawDeleteImConfirm', { name: channel.label })
-    if (!window.confirm(confirmMessage)) return
+    if (!window.confirm(confirmMessage)) { void window.dsGui.focusWindow(); return }
+    void window.dsGui.focusWindow()
     setBusy(true)
     setError(null)
     try {
