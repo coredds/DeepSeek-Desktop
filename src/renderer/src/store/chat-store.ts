@@ -1471,8 +1471,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   selectThread: async (id) => {
+    sseAbort?.abort()
+    sseAbort = null
     if (get().runtimeConnection !== 'ready') {
-      set({ error: i18n.t('common:runtimeActionNeedsConnection') })
+      set({
+        activeThreadId: id,
+        error: i18n.t('common:runtimeActionNeedsConnection')
+      })
       return
     }
     const prevId = get().activeThreadId
@@ -1486,9 +1491,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
     const nextUnread = { ...get().unreadThreadIds }
     delete nextUnread[id]
-
-    sseAbort?.abort()
-    sseAbort = null
     const { providerId } = get()
     const p = getProvider(providerId)
     try {
@@ -1533,6 +1535,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (busy) armBusyWatchdog(set, get)
     } catch (e) {
       set({
+        activeThreadId: id,
         error: formatRuntimeError(e),
         ...(shouldOpenSettingsForError(e)
           ? { route: 'settings' as const, settingsSection: 'agents' as const }

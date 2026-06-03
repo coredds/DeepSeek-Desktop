@@ -107,7 +107,7 @@ export function Sidebar({
       <div className="shrink-0 px-1 pb-2 pt-3">
         <div aria-hidden className="ds-titlebar-safe-block" />
         <div className="flex min-h-8 items-center justify-center px-1 pt-1">
-          <div className="truncate text-center text-[17px] font-medium tracking-[-0.025em] text-ds-ink">
+          <div className="truncate text-center text-[17px] font-semibold tracking-[-0.025em] text-accent">
             {t('appName')}
           </div>
         </div>

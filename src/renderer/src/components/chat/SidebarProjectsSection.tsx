@@ -143,21 +143,47 @@ export function SidebarProjectsSection({
     await onRemoveWorkspace(workspacePath)
   }
 
+  const isPureChat = activeView === 'chat-pure'
+  const headingLabel = isPureChat
+    ? t('chat')
+    : activeView === 'write'
+      ? t('write')
+      : t('sidebarProjects')
+  const headingWorkspaceAction = !isPureChat
+
+  const sortedThreadsFlat = useMemo(() => {
+    if (!isPureChat) return null
+    const query = searchQuery.trim().toLowerCase()
+    return threads
+      .filter((th) => (th.archived === true) === showArchived)
+      .filter((th) => {
+        if (!query) return true
+        const haystack = [th.title, th.preview]
+          .filter(Boolean)
+          .join('\n')
+          .toLowerCase()
+        return haystack.includes(query)
+      })
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+  }, [isPureChat, threads, showArchived, searchQuery])
+
   return (
     <div className="ds-no-drag flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between px-2 pb-1 pt-0.5">
         <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ds-faint">
-          {t('sidebarProjects')}
+          {headingLabel}
         </span>
         <div className="flex items-center gap-0.5">
-          <button
-            type="button"
-            onClick={onPickWorkspace}
-            title={workspaceRoot ? t('changeWorkspace') : t('selectWorkspace')}
-            className="rounded-md p-1 text-ds-faint transition hover:bg-ds-hover/70 hover:text-ds-ink"
-          >
-            <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
-          </button>
+          {headingWorkspaceAction ? (
+            <button
+              type="button"
+              onClick={onPickWorkspace}
+              title={workspaceRoot ? t('changeWorkspace') : t('selectWorkspace')}
+              className="rounded-md p-1 text-ds-faint transition hover:bg-ds-hover/70 hover:text-ds-ink"
+            >
+              <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -170,7 +196,7 @@ export function SidebarProjectsSection({
           <input
             value={searchQuery}
             onChange={(event) => onSearchQueryChange(event.target.value)}
-            placeholder={t('sidebarSearchThreads')}
+            placeholder={isPureChat ? t('sidebarSearchChats') : t('sidebarSearchThreads')}
             className="h-8 w-full rounded-lg border border-transparent bg-white/35 pl-7 pr-7 text-[13px] text-ds-ink outline-none transition placeholder:text-ds-faint focus:border-accent/30 focus:bg-white/60 dark:bg-white/5 dark:focus:bg-white/8"
           />
           {searchQuery.trim() ? (
@@ -202,143 +228,179 @@ export function SidebarProjectsSection({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-0.5 pb-1">
-        {groups.length === 0 ? (
+        {isPureChat ? (
+          sortedThreadsFlat && sortedThreadsFlat.length === 0 ? (
+            <div className="mx-2 mt-2 rounded-lg px-2 py-2">
+              <p className="text-[15px] font-medium text-ds-muted">{t('sidebarEmptyTitle')}</p>
+              <p className="mt-1 text-[13px] leading-5 text-ds-faint">
+                {searchQuery.trim()
+                  ? t('sidebarSearchEmpty')
+                  : runtimeReady
+                    ? t('sidebarEmptySub')
+                    : t('sidebarEmptySubOffline')}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-0.5">
+              {(sortedThreadsFlat ?? []).map((thread) => (
+                <ThreadRow
+                  key={thread.id}
+                  thread={thread}
+                  active={activeThreadId === thread.id}
+                  deleting={deletingThreadIds[thread.id] === true}
+                  locale={locale}
+                  showRunning={
+                    thread.status?.trim().toLowerCase() === 'running' ||
+                    (activeThreadId === thread.id && busy) ||
+                    watchTurnCompletion[thread.id] === true
+                  }
+                  showUnread={
+                    unreadThreadIds[thread.id] === true && activeThreadId !== thread.id
+                  }
+                  onSelect={() => onSelectThread(thread.id)}
+                  onDelete={() => void handleDeleteThread(thread)}
+                  onRestore={() => void handleRestoreThread(thread)}
+                />
+              ))}
+            </div>
+          )
+        ) : groups.length === 0 ? (
           <SidebarEmpty
             runtimeReady={runtimeReady}
             hasWorkspace={!!workspaceRoot}
             onPickWorkspace={onPickWorkspace}
             t={t}
           />
-        ) : null}
-
-        {groups.map(([workspacePath, list]) => {
-          const folderName = workspaceLabelFromPath(workspacePath)
-          const isCollapsed = collapsed[workspacePath] === true
-          const sortedThreads = [...list].sort(
-            (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)
-          )
-          const workspaceExpanded = expandedWorkspaces[workspacePath] === true
-          const hasOverflow = sortedThreads.length > 5
-          const visibleThreads = workspaceExpanded
-            ? sortedThreads
-            : sortedThreads.slice(0, 5)
-          return (
-            <div key={workspacePath} className="mb-1">
-              <div
-                className="group flex w-full items-center gap-0.5 rounded-[10px] text-[14px] font-medium text-ds-ink transition hover:bg-ds-hover/45"
-                title={workspacePath}
-              >
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCollapsed((current) => ({ ...current, [workspacePath]: !current[workspacePath] }))
-                  }
-                  className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1.5 text-left"
+        ) : (
+          groups.map(([workspacePath, list]) => {
+            const folderName = workspaceLabelFromPath(workspacePath)
+            const isWorkspaceCollapsed = collapsed[workspacePath] === true
+            const sortedThreads = [...list].sort(
+              (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)
+            )
+            const workspaceExpanded = expandedWorkspaces[workspacePath] === true
+            const hasOverflow = sortedThreads.length > 5
+            const visibleThreads = workspaceExpanded
+              ? sortedThreads
+              : sortedThreads.slice(0, 5)
+            return (
+              <div key={workspacePath} className="mb-1">
+                <div
+                  className="group flex w-full items-center gap-0.5 rounded-[10px] text-[14px] font-medium text-ds-ink transition hover:bg-ds-hover/45"
+                  title={workspacePath}
                 >
-                  {isCollapsed ? (
-                    <ChevronRight className="h-3 w-3 shrink-0 text-ds-faint" strokeWidth={2} />
-                  ) : (
-                    <ChevronDown className="h-3 w-3 shrink-0 text-ds-faint" strokeWidth={2} />
-                  )}
-                  {isCollapsed ? (
-                    <Folder className="h-3.5 w-3.5 shrink-0 text-ds-muted" strokeWidth={1.75} />
-                  ) : (
-                    <FolderOpen className="h-3.5 w-3.5 shrink-0 text-ds-muted" strokeWidth={1.75} />
-                  )}
-                  <span className="min-w-0 flex-1 truncate">{folderName}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onCreateThreadInWorkspace(workspacePath)
-                  }}
-                  className="shrink-0 rounded-md p-1 text-ds-faint opacity-45 transition hover:bg-ds-hover/80 hover:text-ds-ink hover:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
-                  title={t('sidebarWorkspaceNewThread')}
-                  aria-label={t('sidebarWorkspaceNewThread')}
-                >
-                  <Plus className="h-3.5 w-3.5" strokeWidth={1.9} />
-                </button>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    void handleRemoveWorkspace(workspacePath)
-                  }}
-                  className="mr-1 shrink-0 rounded-md p-1 text-ds-faint opacity-45 transition hover:bg-ds-hover/80 hover:text-red-500 hover:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
-                  title={t('sidebarWorkspaceRemove')}
-                  aria-label={t('sidebarWorkspaceRemove')}
-                >
-                  <Trash2 className="h-3.5 w-3.5" strokeWidth={1.9} />
-                </button>
-              </div>
-
-              {!isCollapsed ? (
-                <div className="mt-0.5 space-y-0.5 pl-2">
-                  {sortedThreads.length === 0 ? (
-                    <div className="flex items-center justify-between gap-2 px-2 py-1">
-                      <div className="text-[12.5px] leading-5 text-ds-faint">
-                        {searchQuery.trim()
-                          ? t('sidebarSearchEmpty')
-                          : showArchived
-                            ? t('sidebarArchiveEmpty')
-                            : t('sidebarWorkspaceEmpty')}
-                      </div>
-                      {!showArchived && !searchQuery.trim() ? (
-                        <button
-                          type="button"
-                          onClick={() => onCreateThreadInWorkspace(workspacePath)}
-                          className="shrink-0 rounded-md px-2 py-1 text-[12px] font-medium text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink"
-                        >
-                          {t('sidebarWorkspaceNewThread')}
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : (
-                    visibleThreads.map((thread) => (
-                      <ThreadRow
-                        key={thread.id}
-                        thread={thread}
-                        active={(activeView === 'chat' || activeView === 'write' || activeView === 'chat-pure') && activeThreadId === thread.id}
-                        deleting={deletingThreadIds[thread.id] === true}
-                        locale={locale}
-                        showRunning={
-                          thread.status?.trim().toLowerCase() === 'running' ||
-                          (activeThreadId === thread.id && busy) ||
-                          watchTurnCompletion[thread.id] === true
-                        }
-                        showUnread={
-                          unreadThreadIds[thread.id] === true && activeThreadId !== thread.id
-                        }
-                        onSelect={() => onSelectThread(thread.id)}
-                        onDelete={() => void handleDeleteThread(thread)}
-                        onRestore={() => void handleRestoreThread(thread)}
-                      />
-                    ))
-                  )}
-                  {hasOverflow ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setExpandedWorkspaces((current) => ({
-                          ...current,
-                          [workspacePath]: !workspaceExpanded
-                        }))
-                      }
-                      className="ml-1 mt-0.5 rounded-md px-2 py-1 text-[12.5px] text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink"
-                    >
-                      {workspaceExpanded
-                        ? t('sidebarWorkspaceShowLess')
-                        : t('sidebarWorkspaceShowMore', {
-                            count: sortedThreads.length - 5
-                          })}
-                    </button>
-                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCollapsed((current) => ({ ...current, [workspacePath]: !current[workspacePath] }))
+                    }
+                    className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1.5 text-left"
+                  >
+                    {isWorkspaceCollapsed ? (
+                      <ChevronRight className="h-3 w-3 shrink-0 text-ds-faint" strokeWidth={2} />
+                    ) : (
+                      <ChevronDown className="h-3 w-3 shrink-0 text-ds-faint" strokeWidth={2} />
+                    )}
+                    {isWorkspaceCollapsed ? (
+                      <Folder className="h-3.5 w-3.5 shrink-0 text-ds-muted" strokeWidth={1.75} />
+                    ) : (
+                      <FolderOpen className="h-3.5 w-3.5 shrink-0 text-ds-muted" strokeWidth={1.75} />
+                    )}
+                    <span className="min-w-0 flex-1 truncate">{folderName}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onCreateThreadInWorkspace(workspacePath)
+                    }}
+                    className="shrink-0 rounded-md p-1 text-ds-faint opacity-45 transition hover:bg-ds-hover/80 hover:text-ds-ink hover:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
+                    title={t('sidebarWorkspaceNewThread')}
+                    aria-label={t('sidebarWorkspaceNewThread')}
+                  >
+                    <Plus className="h-3.5 w-3.5" strokeWidth={1.9} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      void handleRemoveWorkspace(workspacePath)
+                    }}
+                    className="mr-1 shrink-0 rounded-md p-1 text-ds-faint opacity-45 transition hover:bg-ds-hover/80 hover:text-red-500 hover:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
+                    title={t('sidebarWorkspaceRemove')}
+                    aria-label={t('sidebarWorkspaceRemove')}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.9} />
+                  </button>
                 </div>
-              ) : null}
-            </div>
-          )
-        })}
+
+                {!isWorkspaceCollapsed ? (
+                  <div className="mt-0.5 space-y-0.5 pl-2">
+                    {sortedThreads.length === 0 ? (
+                      <div className="flex items-center justify-between gap-2 px-2 py-1">
+                        <div className="text-[12.5px] leading-5 text-ds-faint">
+                          {searchQuery.trim()
+                            ? t('sidebarSearchEmpty')
+                            : showArchived
+                              ? t('sidebarArchiveEmpty')
+                              : t('sidebarWorkspaceEmpty')}
+                        </div>
+                        {!showArchived && !searchQuery.trim() ? (
+                          <button
+                            type="button"
+                            onClick={() => onCreateThreadInWorkspace(workspacePath)}
+                            className="shrink-0 rounded-md px-2 py-1 text-[12px] font-medium text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink"
+                          >
+                            {t('sidebarWorkspaceNewThread')}
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : (
+                      visibleThreads.map((thread) => (
+                        <ThreadRow
+                          key={thread.id}
+                          thread={thread}
+                          active={activeThreadId === thread.id}
+                          deleting={deletingThreadIds[thread.id] === true}
+                          locale={locale}
+                          showRunning={
+                            thread.status?.trim().toLowerCase() === 'running' ||
+                            (activeThreadId === thread.id && busy) ||
+                            watchTurnCompletion[thread.id] === true
+                          }
+                          showUnread={
+                            unreadThreadIds[thread.id] === true && activeThreadId !== thread.id
+                          }
+                          onSelect={() => onSelectThread(thread.id)}
+                          onDelete={() => void handleDeleteThread(thread)}
+                          onRestore={() => void handleRestoreThread(thread)}
+                        />
+                      ))
+                    )}
+                    {hasOverflow ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedWorkspaces((current) => ({
+                            ...current,
+                            [workspacePath]: !workspaceExpanded
+                          }))
+                        }
+                        className="ml-1 mt-0.5 rounded-md px-2 py-1 text-[12.5px] text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink"
+                      >
+                        {workspaceExpanded
+                          ? t('sidebarWorkspaceShowLess')
+                          : t('sidebarWorkspaceShowMore', {
+                              count: sortedThreads.length - 5
+                            })}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            )
+          })
+        )}
       </div>
     </div>
   )
