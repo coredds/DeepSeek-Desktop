@@ -401,6 +401,7 @@ function buildThreadEventSink(
 ): ThreadEventSink {
   return {
     onSeq: (seq) => {
+      if (!get().activeThreadId) return
       resetBusyRecoveryAttempts()
       set((s) => ({
         lastSeq: seq,
@@ -409,6 +410,7 @@ function buildThreadEventSink(
     },
     onUserMessage: (ev) =>
       set((s) => {
+        if (!s.activeThreadId) return {}
         resetBusyRecoveryAttempts()
         const flushed = flushLiveBlocks(s)
         const baseBlocks = flushed.blocks ?? s.blocks
@@ -444,6 +446,7 @@ function buildThreadEventSink(
     onDeltas: (deltas) =>
       set((s) => {
         if (deltas.length === 0) return {}
+        if (!s.activeThreadId) return {}
         resetBusyRecoveryAttempts()
         const nextError = s.error === i18n.t('common:runtimeStreamRecovering') ? null : s.error
         const seqs = deltas
@@ -499,6 +502,7 @@ function buildThreadEventSink(
         }
       }),
     onTool: (ev) => {
+      if (!get().activeThreadId) return
       notifyWriteWorkspaceFileRefresh(get, ev)
       set((s) => {
         resetBusyRecoveryAttempts()
@@ -554,6 +558,7 @@ function buildThreadEventSink(
       })
     },
     onCompaction: (ev) => {
+      if (!get().activeThreadId) return
       set((s) => {
         resetBusyRecoveryAttempts()
         const base: Partial<ChatState> = {}
@@ -675,9 +680,10 @@ function buildThreadEventSink(
       }))
     },
     onTurnComplete: () => {
+      const completedState = get()
+      if (!completedState.activeThreadId) return
       resetBusyRecoveryAttempts()
       clearBusyWatchdog()
-      const completedState = get()
       const completedThreadId = completedState.activeThreadId
       const completedTurnId = completedState.currentTurnId
       const completedKey = completedState.currentTurnId
@@ -728,6 +734,7 @@ function buildThreadEventSink(
       void get().drainQueuedMessages()
     },
     onError: (err) => {
+      if (!get().activeThreadId) return
       resetBusyRecoveryAttempts()
       clearBusyWatchdog()
       const state = get()
@@ -1658,7 +1665,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const state = get()
         const next = state.queuedMessages[0]
         if (!next || state.busy) return
-        const started = await get().sendMessage(next.text, next.mode, { queued: next })
+        const started = await get().sendMessage(next.text, next.mode, {
+          queued: next,
+          ...(next.deepThink ? { deepThink: true } : {}),
+          ...(next.search ? { search: true } : {})
+        })
         if (!started) return
       }
     } finally {
@@ -1705,7 +1716,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
             text: trimmedText,
             ...(mode ? { mode } : {}),
             ...(composerModel ? { model: composerModel } : {}),
-            ...(userModelChip ? { modelLabel: userModelChip } : {})
+            ...(userModelChip ? { modelLabel: userModelChip } : {}),
+            ...(overrides?.deepThink ? { deepThink: true } : {}),
+            ...(overrides?.search ? { search: true } : {})
           }
         ],
         error: null
@@ -1902,7 +1915,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       const { turnId, userMessageItemId } = await p.sendUserMessage(activeThreadId, runtimeText, {
         mode,
-        ...(composerModel ? { model: composerModel } : {})
+        ...(composerModel ? { model: composerModel } : {}),
+        ...(overrides?.deepThink ? { thinking: true } : {}),
+        ...(overrides?.search ? { search: true } : {})
       })
       // Mirror the composer model selection against the runtime's stable
       // user_message item id so the badge survives page refresh / thread
@@ -2232,6 +2247,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       })
       await get().refreshThreads()
+      if (deletingActive) {
+        const remaining = get().threads.filter((t) => t.archived !== true)
+        if (remaining.length > 0) {
+          await get().selectThread(remaining[0].id)
+        }
+      }
     } catch (e) {
       set({
         error: formatRuntimeError(e),

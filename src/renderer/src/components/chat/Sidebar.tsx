@@ -32,6 +32,7 @@ type Props = {
   onThreadSearchChange: (query: string) => void
   onShowArchivedThreadsChange: (show: boolean) => void
   onSelectThread: (id: string) => void
+  onArchiveThread: (id: string) => Promise<void>
   onDeleteThread: (id: string) => Promise<void>
   onRestoreThread: (id: string) => Promise<void>
   onNewChat: () => void
@@ -55,6 +56,7 @@ export function Sidebar({
   onThreadSearchChange,
   onShowArchivedThreadsChange,
   onSelectThread,
+  onArchiveThread,
   onDeleteThread,
   onRestoreThread,
   onNewChat,
@@ -173,6 +175,7 @@ export function Sidebar({
         onRemoveWorkspace={deleteWorkspace}
         onCreateThreadInWorkspace={onNewChatInWorkspace}
         onSelectThread={onSelectThread}
+        onArchiveThread={onArchiveThread}
         onDeleteThread={onDeleteThread}
         onRestoreThread={onRestoreThread}
         onSearchQueryChange={onThreadSearchChange}

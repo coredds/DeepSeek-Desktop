@@ -7,10 +7,12 @@ import {
   Clock3,
   GitFork,
   Gauge,
+  Lightbulb,
   ListTodo,
   Minimize2,
   Paperclip,
   RotateCcw,
+  Search,
   Send,
   Square,
   X
@@ -54,6 +56,10 @@ type Props = {
   onSend: () => void
   onInterrupt: () => void
   onOpenRuntimePanel?: () => void
+  deepThink: boolean
+  setDeepThink: (v: boolean) => void
+  smartSearch: boolean
+  setSmartSearch: (v: boolean) => void
 }
 
 type SlashCommandId = 'plan' | 'agent' | 'compact' | 'fork' | 'archive' | 'restore' | 'runtime' | 'usage'
@@ -95,7 +101,11 @@ export function FloatingComposer({
   onAttachmentsChange,
   onSend,
   onInterrupt,
-  onOpenRuntimePanel
+  onOpenRuntimePanel,
+  deepThink,
+  setDeepThink,
+  smartSearch,
+  setSmartSearch
 }: Props): ReactElement {
   const { t } = useTranslation('common')
   const route = useChatStore((s) => s.route)
@@ -147,9 +157,7 @@ export function FloatingComposer({
   const canCompose = runtimeReady && (
     route === 'claw'
       ? clawHasInboundConversation
-      : route === 'chat-pure'
-        ? true
-        : (hasActiveThread || !!effectiveWorkspaceRoot)
+      : true
   )
   const canChangeModel = canCompose && !busy
   const canSend = canCompose && input.trim().length > 0
@@ -327,6 +335,14 @@ export function FloatingComposer({
   useLayoutEffect(() => {
     resizeTextarea()
   }, [canCompose, input, resizeTextarea])
+
+  const prevActiveThreadId = useRef(activeThreadId)
+  useEffect(() => {
+    if (canCompose && prevActiveThreadId.current && !activeThreadId) {
+      window.requestAnimationFrame(() => textareaRef.current?.focus())
+    }
+    prevActiveThreadId.current = activeThreadId
+  }, [canCompose, activeThreadId])
 
   useEffect(() => {
     const el = textareaRef.current
@@ -671,6 +687,41 @@ export function FloatingComposer({
               >
                 <ListTodo className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
                 <span>{t('planMode')}</span>
+              </button>
+            </div>
+          ) : null}
+
+          {variant !== 'compact' && route !== 'claw' ? (
+            <div className="flex items-center gap-2 px-1 pt-1">
+              <button
+                type="button"
+                onClick={() => setDeepThink(!deepThink)}
+                className={
+                  deepThink
+                    ? 'ds-chip-active ds-no-drag inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-semibold text-ds-ink transition hover:brightness-105'
+                    : 'ds-chip-muted ds-no-drag inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-medium text-ds-muted transition hover:text-ds-ink'
+                }
+                title={t('deepThinkTooltip')}
+                aria-label={t('deepThink')}
+                aria-pressed={deepThink}
+              >
+                <Lightbulb className={`h-3.5 w-3.5 ${deepThink ? 'text-accent' : ''}`} strokeWidth={2} />
+                <span>{t('deepThink')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSmartSearch(!smartSearch)}
+                className={
+                  smartSearch
+                    ? 'ds-chip-active ds-no-drag inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-semibold text-ds-ink transition hover:brightness-105'
+                    : 'ds-chip-muted ds-no-drag inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-medium text-ds-muted transition hover:text-ds-ink'
+                }
+                title={t('smartSearchTooltip')}
+                aria-label={t('smartSearch')}
+                aria-pressed={smartSearch}
+              >
+                <Search className={`h-3.5 w-3.5 ${smartSearch ? 'text-accent' : ''}`} strokeWidth={2} />
+                <span>{t('smartSearch')}</span>
               </button>
             </div>
           ) : null}

@@ -21,6 +21,8 @@ export type QueuedUserMessage = {
   mode?: string
   model?: string
   modelLabel?: string
+  deepThink?: boolean
+  search?: boolean
 }
 
 export type SendMessageOverrides = {
@@ -28,6 +30,8 @@ export type SendMessageOverrides = {
   model?: string
   modelLabel?: string
   attachments?: AttachmentItem[]
+  deepThink?: boolean
+  search?: boolean
 }
 
 export type InitialSetupMode = 'required' | 'preview'

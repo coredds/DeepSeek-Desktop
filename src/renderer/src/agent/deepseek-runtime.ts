@@ -128,6 +128,8 @@ type RuntimeErrorJson = {
 type RuntimeExecutionFlags = {
   auto_approve: boolean
   trust_mode: boolean
+  thinking?: boolean
+  search?: boolean
 }
 
 const TOOL_ITEM_KINDS = new Set(['tool_call', 'command_execution', 'file_change'])
@@ -417,10 +419,15 @@ function toRuntimeError(info: RuntimeErrorJson & { message: string }): Error {
   )
 }
 
-function runtimeExecutionFlags(settings: AppSettingsV1): RuntimeExecutionFlags {
+function runtimeExecutionFlags(
+  settings: AppSettingsV1,
+  options?: { thinking?: boolean; search?: boolean }
+): RuntimeExecutionFlags {
   return {
     auto_approve: settings.deepseek.approvalPolicy === 'auto',
-    trust_mode: settings.deepseek.sandboxMode === 'danger-full-access'
+    trust_mode: settings.deepseek.sandboxMode === 'danger-full-access',
+    ...(options?.thinking ? { thinking: true } : {}),
+    ...(options?.search ? { search: true } : {})
   }
 }
 
@@ -700,10 +707,10 @@ export class DeepseekRuntimeProvider implements AgentProvider {
   async sendUserMessage(
     threadId: string,
     text: string,
-    options?: { mode?: string; model?: string }
+    options?: { mode?: string; model?: string; thinking?: boolean; search?: boolean }
   ): Promise<{ turnId: string; threadId: string; userMessageItemId?: string }> {
     const settings = await window.dsGui.getSettings()
-    const flags = runtimeExecutionFlags(settings)
+    const flags = runtimeExecutionFlags(settings, options)
     const r = await window.dsGui.runtimeRequest(
       `/v1/threads/${encodeURIComponent(threadId)}/turns`,
       'POST',

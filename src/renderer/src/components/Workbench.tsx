@@ -320,6 +320,8 @@ export function Workbench(): ReactElement {
   )
   const [input, setInput] = useState('')
   const [mode, setMode] = useState<'plan' | 'agent'>('agent')
+  const [deepThink, setDeepThink] = useState(false)
+  const [smartSearch, setSmartSearch] = useState(false)
   const [attachments, setAttachments] = useState<AttachmentItem[]>([])
   const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>(readStoredRightPanelMode)
   const [filePreviewTarget, setFilePreviewTarget] = useState<WorkspaceFileTarget | null>(null)
@@ -719,7 +721,11 @@ export function Workbench(): ReactElement {
     setInput('')
     const currentAttachments = [...attachments]
     setAttachments([])
-    void sendMessage(v, mode === 'plan' ? 'plan' : 'agent', currentAttachments.length > 0 ? { attachments: currentAttachments } : undefined)
+    void sendMessage(v, mode === 'plan' ? 'plan' : 'agent', {
+      ...(currentAttachments.length > 0 ? { attachments: currentAttachments } : {}),
+      ...(deepThink ? { deepThink: true } : {}),
+      ...(smartSearch ? { search: true } : {})
+    })
   }
 
   const openThread = (id: string): void => {
@@ -1046,6 +1052,7 @@ export function Workbench(): ReactElement {
               onThreadSearchChange={setThreadSearch}
               onShowArchivedThreadsChange={setShowArchivedThreads}
               onSelectThread={openThread}
+              onArchiveThread={(id) => archiveThread(id, true)}
               onDeleteThread={deleteThread}
               onRestoreThread={(id) => archiveThread(id, false)}
               onNewChat={startNewChat}
@@ -1200,6 +1207,10 @@ export function Workbench(): ReactElement {
                 onRemoveQueuedMessage={removeQueuedMessage}
                 onInterrupt={() => void interrupt()}
                 onOpenRuntimePanel={openRuntimePanel}
+                deepThink={deepThink}
+                setDeepThink={setDeepThink}
+                smartSearch={smartSearch}
+                setSmartSearch={setSmartSearch}
               />
             </div>
           </section>

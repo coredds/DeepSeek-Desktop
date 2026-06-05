@@ -40,6 +40,7 @@ type SidebarProjectsSectionProps = {
   onRemoveWorkspace: (workspacePath: string) => Promise<void>
   onCreateThreadInWorkspace: (workspacePath: string) => void
   onSelectThread: (threadId: string) => void
+  onArchiveThread: (threadId: string) => Promise<void>
   onDeleteThread: (threadId: string) => Promise<void>
   onRestoreThread: (threadId: string) => Promise<void>
   onSearchQueryChange: (query: string) => void
@@ -63,6 +64,7 @@ export function SidebarProjectsSection({
   onRemoveWorkspace,
   onCreateThreadInWorkspace,
   onSelectThread,
+  onArchiveThread,
   onDeleteThread,
   onRestoreThread,
   onSearchQueryChange,
@@ -108,10 +110,25 @@ export function SidebarProjectsSection({
     })
   }, [searchQuery, showArchived, threads, workspaceRoot])
 
+  const handleArchiveThread = async (thread: NormalizedThread): Promise<void> => {
+    const threadId = thread.id.trim()
+    if (!threadId || deletingThreadIds[threadId]) return
+    setDeletingThreadIds((prev) => ({ ...prev, [threadId]: true }))
+    try {
+      await onArchiveThread(threadId)
+    } finally {
+      setDeletingThreadIds((prev) => {
+        const next = { ...prev }
+        delete next[threadId]
+        return next
+      })
+    }
+  }
+
   const handleDeleteThread = async (thread: NormalizedThread): Promise<void> => {
     const threadId = thread.id.trim()
     if (!threadId || deletingThreadIds[threadId]) return
-    const confirmMessage = t('sidebarThreadArchiveConfirm', { title: thread.title })
+    const confirmMessage = t('sidebarThreadDeleteConfirm', { title: thread.title })
     if (!window.confirm(confirmMessage)) { void window.dsGui.focusWindow(); return }
     void window.dsGui.focusWindow()
     setDeletingThreadIds((prev) => ({ ...prev, [threadId]: true }))
@@ -287,6 +304,7 @@ export function SidebarProjectsSection({
                     unreadThreadIds[thread.id] === true && activeThreadId !== thread.id
                   }
                   onSelect={() => onSelectThread(thread.id)}
+                  onArchive={() => void handleArchiveThread(thread)}
                   onDelete={() => void handleDeleteThread(thread)}
                   onRestore={() => void handleRestoreThread(thread)}
                 />
@@ -401,6 +419,7 @@ export function SidebarProjectsSection({
                             unreadThreadIds[thread.id] === true && activeThreadId !== thread.id
                           }
                           onSelect={() => onSelectThread(thread.id)}
+                          onArchive={() => void handleArchiveThread(thread)}
                           onDelete={() => void handleDeleteThread(thread)}
                           onRestore={() => void handleRestoreThread(thread)}
                         />
@@ -445,6 +464,7 @@ type ThreadRowProps = {
   showRunning: boolean
   showUnread: boolean
   onSelect: () => void
+  onArchive: () => void
   onDelete: () => void
   onRestore: () => void
 }
@@ -457,6 +477,7 @@ function ThreadRow({
   showRunning,
   showUnread,
   onSelect,
+  onArchive,
   onDelete,
   onRestore
 }: ThreadRowProps): ReactElement {
@@ -494,7 +515,7 @@ function ThreadRow({
       <button
         type="button"
         onClick={onSelect}
-        className="flex w-full items-start gap-1.5 px-3 py-2 pr-8 text-left"
+        className="flex w-full items-start gap-1.5 px-3 py-2 pr-14 text-left"
         disabled={deleting}
         aria-label={ariaLabel}
         title={forkLabel ? `${thread.title}\n${forkLabel}` : thread.title}
@@ -550,31 +571,62 @@ function ThreadRow({
           </span>
         </span>
       </button>
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation()
-          if (archived) {
-            onRestore()
-          } else {
-            onDelete()
-          }
-        }}
-        disabled={deleting}
-        className={`absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-ds-faint opacity-0 transition hover:bg-ds-hover focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-100 ${
-          archived ? 'hover:text-accent' : 'hover:text-red-600'
-        }`}
-        title={archived ? t('sidebarThreadRestore') : t('sidebarThreadArchive')}
-        aria-label={archived ? t('sidebarThreadRestore') : t('sidebarThreadArchive')}
-      >
-        {deleting ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
-        ) : archived ? (
-          <RotateCcw className="h-3.5 w-3.5" strokeWidth={1.9} />
+      <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
+        {archived ? (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              onRestore()
+            }}
+            disabled={deleting}
+            className="flex h-6 w-6 items-center justify-center rounded-md text-ds-faint opacity-0 transition group-hover:opacity-100 hover:bg-ds-hover hover:text-accent disabled:cursor-not-allowed disabled:opacity-100"
+            title={t('sidebarThreadRestore')}
+            aria-label={t('sidebarThreadRestore')}
+          >
+            {deleting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+            ) : (
+              <RotateCcw className="h-3.5 w-3.5" strokeWidth={1.9} />
+            )}
+          </button>
         ) : (
-          <Archive className="h-3.5 w-3.5" strokeWidth={1.9} />
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              onArchive()
+            }}
+            disabled={deleting}
+            className="flex h-6 w-6 items-center justify-center rounded-md text-ds-faint opacity-0 transition group-hover:opacity-100 hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-100"
+            title={t('sidebarThreadArchive')}
+            aria-label={t('sidebarThreadArchive')}
+          >
+            {deleting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+            ) : (
+              <Archive className="h-3.5 w-3.5" strokeWidth={1.9} />
+            )}
+          </button>
         )}
-      </button>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation()
+            onDelete()
+          }}
+          disabled={deleting}
+          className="flex h-6 w-6 items-center justify-center rounded-md text-ds-faint opacity-0 transition group-hover:opacity-100 hover:bg-ds-hover hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-100"
+          title={t('sidebarThreadDelete')}
+          aria-label={t('sidebarThreadDelete')}
+        >
+          {deleting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+          ) : (
+            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.9} />
+          )}
+        </button>
+      </div>
     </div>
   )
 }

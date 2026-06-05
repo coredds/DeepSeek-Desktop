@@ -258,6 +258,10 @@ export function WriteAssistantPanel({
           onAttachmentsChange={() => {}}
           onSend={onSend}
           onInterrupt={onInterrupt}
+          deepThink={false}
+          setDeepThink={() => {}}
+          smartSearch={false}
+          setSmartSearch={() => {}}
         />
       </div>
     </aside>
