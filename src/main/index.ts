@@ -16,8 +16,6 @@ import {
 } from './deepseek-process'
 import { resolveDeepseekExecutable } from './resolve-deepseek-binary'
 import {
-  mergeClawSettings,
-  mergeWriteSettings,
   normalizeAppSettings,
   type AppSettingsPatch,
   type AppSettingsV1
@@ -28,16 +26,8 @@ import {
   checkDeepseekTuiUpdate,
   installDeepseekTuiUpdatePackage
 } from './deepseek-updater'
-import { deepseekTuiConfigChanged, syncDeepseekTuiConfig } from './deepseek-config'
+import { deepseekTuiConfigChanged, resolveDeepseekConfigPath, syncDeepseekTuiConfig } from './deepseek-config'
 import { configureLogger, logError, logWarn, pruneOnStartup } from './logger'
-import { createClawRuntime, type ClawRuntime } from './claw-runtime'
-import { runClawScheduleMcpServerFromArgv } from './claw-schedule-mcp-server'
-import {
-  clawScheduleMcpSettingsChanged,
-  resolveDeepseekConfigPath,
-  syncClawScheduleMcpConfig,
-  type ClawScheduleMcpLaunchConfig
-} from './claw-schedule-mcp-config'
 import { sseStartPayloadSchema, streamIdSchema } from './ipc/app-ipc-schemas'
 import { createTerminalService } from './services/terminal-service'
 import { registerAppIpcHandlers } from './ipc/register-app-ipc-handlers'
@@ -57,38 +47,18 @@ function traceStartup(label: string, detail?: unknown): void {
   }
 }
 
-const runningClawScheduleMcpServer = process.argv.includes('--claw-schedule-mcp-server')
+const runningClawScheduleMcpServer = false
 
 traceStartup('main module evaluated')
 
-if (!runningClawScheduleMcpServer && process.platform === 'win32') {
+if (process.platform === 'win32') {
   app.setAppUserModelId(APP_USER_MODEL_ID)
 }
 
 let mainWindow: BrowserWindow | null = null
 let store: JsonSettingsStore
 let logDir = ''
-let clawRuntime: ClawRuntime | null = null
 const terminalService = createTerminalService()
-
-function emitClawChannelActivity(payload: { channelId: string; threadId: string }): void {
-  if (!mainWindow || mainWindow.isDestroyed()) return
-  mainWindow.webContents.send('claw:channel-activity', payload)
-}
-
-type ClawPlatformInstallStartResult =
-  | { ok: true; url: string; deviceCode: string; interval: number; expireIn: number }
-  | { ok: false; message: string }
-
-type ClawPlatformInstallPollResult =
-  | { done: true; kind: 'feishu'; appId: string; appSecret: string; domain: string }
-  | { done: false; error?: string }
-
-let feishuInstallIsLark = false
-
-function resolveLogDirectory(): string {
-  return join(app.getPath('userData'), 'logs')
-}
 
 function resolvePreloadPath(): string {
   const cjsPath = join(__dirname, '../preload/index.cjs')
@@ -96,139 +66,8 @@ function resolvePreloadPath(): string {
   return join(__dirname, '../preload/index.mjs')
 }
 
-function getClawScheduleMcpLaunchConfig(): ClawScheduleMcpLaunchConfig {
-  return {
-    appPath: app.getAppPath(),
-    execPath: process.execPath,
-    isPackaged: app.isPackaged
-  }
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {}
-}
-
-function recordString(record: Record<string, unknown>, key: string): string {
-  const value = record[key]
-  return typeof value === 'string' ? value.trim() : ''
-}
-
-async function readJsonResponse(res: Response): Promise<Record<string, unknown>> {
-  const text = await res.text()
-  try {
-    return asRecord(JSON.parse(text) as unknown)
-  } catch {
-    return { message: text.trim() || res.statusText }
-  }
-}
-
-async function postJson(url: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(10_000)
-  })
-  const data = await readJsonResponse(res)
-  if (!res.ok) {
-    throw new Error(recordString(data, 'errmsg') || recordString(data, 'message') || `HTTP ${res.status}`)
-  }
-  return data
-}
-
-async function postForm(url: string, body: Record<string, string>): Promise<Record<string, unknown>> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(body).toString(),
-    signal: AbortSignal.timeout(10_000)
-  })
-  const data = await readJsonResponse(res)
-  if (!res.ok) {
-    throw new Error(recordString(data, 'error_description') || recordString(data, 'message') || `HTTP ${res.status}`)
-  }
-  return data
-}
-
-async function postFormResult(
-  url: string,
-  body: Record<string, string>
-): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(body).toString(),
-    signal: AbortSignal.timeout(10_000)
-  })
-  const data = await readJsonResponse(res)
-  return { ok: res.ok, status: res.status, data }
-}
-
-function normalizeIntervalSeconds(value: unknown, fallback: number): number {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? Math.max(3, Math.floor(parsed)) : fallback
-}
-
-async function startFeishuInstallQrcode(isLark: boolean): Promise<ClawPlatformInstallStartResult> {
-  try {
-    const baseUrl = isLark ? 'https://accounts.larksuite.com' : 'https://accounts.feishu.cn'
-    feishuInstallIsLark = isLark
-    await postForm(`${baseUrl}/oauth/v1/app/registration`, { action: 'init' })
-    const data = await postForm(`${baseUrl}/oauth/v1/app/registration`, {
-      action: 'begin',
-      archetype: 'PersonalAgent',
-      auth_method: 'client_secret',
-      request_user_info: 'open_id'
-    })
-    const url = recordString(data, 'verification_uri_complete')
-    const deviceCode = recordString(data, 'device_code')
-    if (!url || !deviceCode) {
-      throw new Error(recordString(data, 'error_description') || recordString(data, 'message') || 'Feishu QR response is incomplete.')
-    }
-    return {
-      ok: true,
-      url,
-      deviceCode,
-      interval: normalizeIntervalSeconds(data.interval, 5),
-      expireIn: normalizeIntervalSeconds(data.expire_in ?? data.expires_in, 300)
-    }
-  } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : String(error) }
-  }
-}
-
-async function pollFeishuInstall(deviceCode: string): Promise<ClawPlatformInstallPollResult> {
-  try {
-    const baseUrl = feishuInstallIsLark ? 'https://accounts.larksuite.com' : 'https://accounts.feishu.cn'
-    const result = await postFormResult(`${baseUrl}/oauth/v1/app/registration`, {
-      action: 'poll',
-      device_code: deviceCode
-    })
-    const data = result.data
-    const error = recordString(data, 'error')
-    if (error) {
-      if (error === 'authorization_pending' || error === 'slow_down') return { done: false }
-      return { done: false, error: recordString(data, 'error_description') || error }
-    }
-    if (!result.ok) {
-      return {
-        done: false,
-        error: recordString(data, 'error_description') || recordString(data, 'message') || `HTTP ${result.status}`
-      }
-    }
-    const appId = recordString(data, 'client_id')
-    const appSecret = recordString(data, 'client_secret')
-    if (appId && appSecret) {
-      const userInfo = asRecord(data.user_info)
-      const domain = recordString(userInfo, 'tenant_brand') === 'lark' ? 'lark' : 'feishu'
-      return { done: true, kind: 'feishu', appId, appSecret, domain }
-    }
-    return { done: false }
-  } catch (error) {
-    return { done: false, error: error instanceof Error ? error.message : String(error) }
-  }
+function resolveLogDirectory(): string {
+  return join(app.getPath('userData'), 'logs')
 }
 
 function installDevPreviewWebviewGuards(): void {
@@ -282,11 +121,8 @@ function createAppIcon(source: string): Electron.NativeImage {
 
 const appIcon = createAppIcon(deepseekLogoPng)
 traceStartup('app icon loaded', { source: deepseekLogoPng.startsWith('data:') ? 'data-url' : 'path' })
-const gotSingleInstanceLock = runningClawScheduleMcpServer || app.requestSingleInstanceLock()
-traceStartup('single instance lock checked', {
-  gotSingleInstanceLock,
-  skippedForClawScheduleMcpServer: runningClawScheduleMcpServer
-})
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+traceStartup('single instance lock checked', { gotSingleInstanceLock })
 
 function normalizeNotificationText(raw: string | undefined, fallback: string, maxLength: number): string {
   const value = typeof raw === 'string' && raw.trim() ? raw.trim() : fallback
@@ -661,7 +497,7 @@ function deepseekLaunchConfigChanged(prev: AppSettingsV1, next: AppSettingsV1): 
 }
 
 function runtimeStartupConfigChanged(prev: AppSettingsV1, next: AppSettingsV1): boolean {
-  return deepseekLaunchConfigChanged(prev, next) || clawScheduleMcpSettingsChanged(prev, next)
+  return deepseekLaunchConfigChanged(prev, next)
 }
 
 async function restartManagedRuntimeForSettingsChange(
@@ -737,12 +573,6 @@ async function runtimeRequest(
   }
 }
 
-if (runningClawScheduleMcpServer) {
-  void runClawScheduleMcpServerFromArgv(process.argv).catch((error) => {
-    console.error('[claw-schedule-mcp] server failed:', error)
-    process.exit(1)
-  })
-} else {
 app.whenReady().then(async () => {
   traceStartup('app.whenReady:start')
   if (!gotSingleInstanceLock) return
@@ -759,9 +589,6 @@ app.whenReady().then(async () => {
   traceStartup('settings load:start')
   const initial = await store.load()
   traceStartup('settings load:done')
-  await syncClawScheduleMcpConfig(initial, getClawScheduleMcpLaunchConfig()).catch((error) => {
-    console.error('[claw-schedule-mcp] failed to sync config on startup:', error)
-  })
 
   logDir = resolveLogDirectory()
   configureLogger({
@@ -770,8 +597,6 @@ app.whenReady().then(async () => {
     retentionDays: initial.log.retentionDays
   })
   traceStartup('logger configured')
-  clawRuntime = createClawRuntime({ store, runtimeRequest, logError, notifyChannelActivity: emitClawChannelActivity })
-  clawRuntime.sync(initial)
 
   traceStartup('ipc registration:start')
   const applySettingsPatch = async (partial: AppSettingsPatch): Promise<AppSettingsV1> => {
@@ -782,19 +607,13 @@ app.whenReady().then(async () => {
       deepseek: { ...prev.deepseek, ...(partial.deepseek ?? {}) },
       log: { ...prev.log, ...(partial.log ?? {}) },
       notifications: { ...prev.notifications, ...(partial.notifications ?? {}) },
-      write: mergeWriteSettings(prev.write, partial.write),
-      claw: mergeClawSettings(prev.claw, partial.claw),
       agentProvider: 'deepseek-runtime'
     })
     if (prev.log.enabled !== next.log.enabled || prev.log.retentionDays !== next.log.retentionDays) {
       configureLogger({ enabled: next.log.enabled, retentionDays: next.log.retentionDays })
     }
     const saved = await store.patch(partial)
-    await syncClawScheduleMcpConfig(saved, getClawScheduleMcpLaunchConfig()).catch((error) => {
-      console.error('[claw-schedule-mcp] failed to sync config after settings change:', error)
-    })
     queueRuntimeSettingsApply(prev, saved)
-    clawRuntime?.sync(saved)
     return saved
   }
 
@@ -885,9 +704,6 @@ app.whenReady().then(async () => {
       return runtimeRequest(settings, path, { method, body })
     },
     fetchUpstreamModels: fetchModels,
-    getClawRuntime: () => clawRuntime,
-    startFeishuInstallQrcode,
-    pollFeishuInstall,
     prepareDeepseekBinary,
     checkDeepseekUpdate: checkDeepseekUpdateForSettings,
     installDeepseekUpdate: installDeepseekUpdateForSettings,
@@ -1043,7 +859,6 @@ app.whenReady().then(async () => {
   dialog.showErrorBox('DeepSeek Desktop failed to start', message)
   app.quit()
 })
-}
 
 app.on('window-all-closed', () => {
   stopDeepseekChild()
@@ -1053,6 +868,5 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
-  clawRuntime?.stop()
   stopDeepseekChild()
 })

@@ -1,4 +1,6 @@
 import { spawn } from 'node:child_process'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import type { AppSettingsV1 } from '../shared/app-settings'
 import { resolveDeepseekExecutable } from './resolve-deepseek-binary'
 
@@ -139,4 +141,8 @@ export async function syncDeepseekTuiConfig(
   for (const command of commands) {
     await runDeepseekCommand(bin, command)
   }
+}
+
+export function resolveDeepseekConfigPath(): string {
+  return join(homedir(), '.config', 'deepseek', 'config.toml')
 }

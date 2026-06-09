@@ -1,41 +1,52 @@
 # Roadmap
 
-## Phase 1 — Polish (immediate) ✓
+## Now — Polish (v0.2.x)
 
-Goal: reduce friction, improve first impressions. No new architecture.
+- [x] Streamlined to single chat mode — no mode switching, one consistent interface.
+- [x] Whale logo in sidebar header replacing verbose branding.
+- [x] Clean empty-state hero with no suggestion cards.
+- [x] Section headings simplified (compact tool counts instead of verbose sentences).
+- [x] Removed non-functional Deep Think / Smart Search toggles.
+- [x] Fixed thread deletion locking the composer.
+- [x] Ctrl+N correctly creates a thread from any view.
 
-- [x] **AGENTS.md** — codebase map, build commands, architecture overview (`AGENTS.md`)
-- [x] **Simplified onboarding** — removed single-option language picker, added one-click "Try with sample workspace", runtime startup progress spinner (`InitialSetupDialog.tsx`)
-- [x] **Keyboard shortcut panel** — press `?` anywhere for quick-reference overlay of all shortcuts (`KeyboardShortcutPanel.tsx`); shortcuts display `⌘`/`Ctrl` based on platform
-- [x] **Workspace health indicator** — git dirty-file count, large-file warnings (>100 MB in workspace root), low-disk alerts (<1 GB free) in the connection status bar (`ConnectionStatusBar.tsx`, `workspace-health-service.ts`)
+## Next — Skills & MCP (v0.3)
 
-## Phase 2 — Differentiate (1–2 sprints)
+Goal: make finding, installing, and managing skills and MCP servers a first-class experience.
 
-Goal: features no other desktop agent has.
+### Plugin discoverability
+- [ ] **Featured & curated feed** — highlighted community skills/MCPs with descriptions, ratings, and install counts surfaced in the marketplace.
+- [ ] **Search with results** — free-text search across plugin names, descriptions, and tags.
+- [ ] **One-click install** — install a plugin without navigating to separate config editors.
+- [ ] **Post-install guidance** — after installing an MCP server, show required env vars inline and a "Configure" button to fill them in.
 
-### Write mode upgrade
-- [x] **Template system** — `~/.deepseekdesktop/templates/` directory; `.md` templates with YAML frontmatter appear in Write mode's "From template" section (`WriteTemplatePicker.tsx`, `template-service.ts`)
-- [ ] **Git-backed version history** — per writing space, "History" button shows `git log -- <file>` and allows restoring previous versions via existing git-service
+### Skill management
+- [ ] **Skill editor** — create and edit skills directly in the app (not through external file editing).
+- [ ] **Skill validation** — validate SKILL.md format, required fields, and YAML frontmatter on creation/save.
+- [ ] **Skill folders browser** — pick from local skill directories; add and remove folders without typing paths.
+- [ ] **Built-in skill library** — bundle a set of useful default skills (project scaffolding, git workflows, code review checklists).
 
-### Claw mode expansion
-- [ ] **Discord webhook provider** — new IM provider using Discord webhook API; reuses existing Claw channel/agent infrastructure
-- [ ] **Slack webhook provider** — new IM provider using Slack Incoming Webhooks; same architecture
+### MCP management
+- [ ] **MCP status dashboard** — see which MCP servers are running, their health, and recent errors.
+- [ ] **MCP log viewer** — view stdout/stderr from running MCP servers inline.
+- [ ] **Env var management** — edit environment variables per MCP server in a structured form (not raw JSON).
+- [ ] **Quick-add snippets** — paste a GitHub URL or `npx` command; the app parses and creates the MCP config entry.
 
-### Terminal upgrade
-- [x] **Terminal command palette** — `Ctrl+Shift+P` shows npm script suggestions, recently run commands, "explain this error" action (`TerminalCommandPalette.tsx`, `AppTerminalPanel.tsx`)
+### Plugin registry
+- [ ] **Community registry** — GitHub-backed plugin index with versioned manifests.
+- [ ] **Plugin manifest format** — `deepseek-plugin.json` schema: name, description, MCP config, skills, compatibility.
+- [ ] **Auto-update** — check registry for new versions of installed plugins.
 
-## Phase 3 — Power tools (2–3 sprints)
+## Later — Power tools (v0.4+)
 
-Goal: close gaps with commercial desktops without sacrificing local-first identity.
-
-- [ ] **Dev server integration** — auto-detect `npm run dev` success (done: `dev-preview-detection.ts`), preview panel (done: `DevBrowserPanel.tsx`); pending: dev server console output in side panel, HMR event reflection
-- [ ] **PR review workflow** — paste GitHub/GitLab PR URL → checkout branch → send structured diff to agent → surface findings in change inspector
-- [ ] **Plugin/extension system** — define `deepseek-plugin.json` manifest format (MCP servers, skills, shortcuts, slash commands); community plugin registry (GitHub-based); marketplace already has prerequisites badges + env config flow (`PluginMarketplaceView.tsx`)
-- [x] **MCP marketplace polish** — prerequisite badges warn users before install, env vars are uncommented with placeholders, "Configure" button opens Settings → MCP editor; added WhatsApp MCP to recommended items
+- [ ] **Dev server integration** — auto-detect `npm run dev`, preview panel, HMR reflection.
+- [ ] **PR review workflow** — paste GitHub/GitLab PR URL, agent reviews diff and surfaces findings.
+- [ ] **Plugin/extension system** — community plugin registry with `deepseek-plugin.json` manifest format.
+- [ ] **Agent presets** — save and restore agent configurations (model, skills, MCPs, workspace) as named profiles.
 
 ### Guidelines
 
-- **No cloud sync or accounts** — local-first is a feature, not a gap
-- **No desktop automation / screen control** — scope risk and security surface don't justify the complexity
-- **No built-in model serving** — the app wraps the TUI runtime; model infrastructure belongs upstream
-- **No auto-update** — not needed until the project has stable releases and distribution channels
+- **No cloud sync or accounts** — local-first is a feature.
+- **No desktop automation / screen control** — scope risk outweighs utility.
+- **No built-in model serving** — model infrastructure belongs upstream.
+- **No auto-update** — not needed until stable releases and distribution channels exist.

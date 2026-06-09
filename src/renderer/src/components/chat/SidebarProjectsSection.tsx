@@ -21,12 +21,11 @@ import {
 import type { NormalizedThread } from '../../agent/types'
 import { formatRelativeTime } from '../../lib/format-relative-time'
 import { workspaceLabelFromPath } from '../../lib/workspace-label'
-import { isClawWorkspacePath, isInternalTemporaryWorkspace, normalizeWorkspaceRoot } from '../../lib/workspace-path'
+import { isInternalTemporaryWorkspace, normalizeWorkspaceRoot } from '../../lib/workspace-path'
 import { MessageSearchPanel } from './MessageSearchPanel'
 
 type SidebarProjectsSectionProps = {
   threads: NormalizedThread[]
-  activeView: 'chat-pure' | 'chat' | 'write' | 'claw'
   activeThreadId: string | null
   runtimeReady: boolean
   searchQuery: string
@@ -50,7 +49,6 @@ type SidebarProjectsSectionProps = {
 
 export function SidebarProjectsSection({
   threads,
-  activeView,
   activeThreadId,
   runtimeReady,
   searchQuery,
@@ -83,7 +81,6 @@ export function SidebarProjectsSection({
 
     for (const th of threads) {
       if (isInternalTemporaryWorkspace(th.workspace)) continue
-      if (isClawWorkspacePath(th.workspace)) continue
       if ((th.archived === true) !== showArchived) continue
       const key = normalizeWorkspaceRoot(th.workspace)
       if (!key) continue
@@ -165,29 +162,10 @@ export function SidebarProjectsSection({
     await onRemoveWorkspace(workspacePath)
   }
 
-  const isPureChat = activeView === 'chat-pure'
-  const headingLabel = isPureChat
-    ? t('chat')
-    : activeView === 'write'
-      ? t('write')
-      : t('sidebarProjects')
-  const headingWorkspaceAction = !isPureChat
+  const headingLabel = t('sidebarProjects')
+  const headingWorkspaceAction = true
 
-  const sortedThreadsFlat = useMemo(() => {
-    if (!isPureChat) return null
-    const query = searchQuery.trim().toLowerCase()
-    return threads
-      .filter((th) => (th.archived === true) === showArchived)
-      .filter((th) => {
-        if (!query) return true
-        const haystack = [th.title, th.preview]
-          .filter(Boolean)
-          .join('\n')
-          .toLowerCase()
-        return haystack.includes(query)
-      })
-      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-  }, [isPureChat, threads, showArchived, searchQuery])
+  const searchPlaceholder = t('sidebarSearchThreads')
 
   return (
     <div className="ds-no-drag flex min-h-0 flex-1 flex-col">
@@ -242,7 +220,7 @@ export function SidebarProjectsSection({
           <input
             value={searchQuery}
             onChange={(event) => onSearchQueryChange(event.target.value)}
-            placeholder={isPureChat ? t('sidebarSearchChats') : t('sidebarSearchThreads')}
+            placeholder={searchPlaceholder}
             className="h-8 w-full rounded-lg border border-transparent bg-white/35 pl-7 pr-7 text-[13px] text-ds-ink outline-none transition placeholder:text-ds-faint focus:border-accent/30 focus:bg-white/60 dark:bg-white/5 dark:focus:bg-white/8"
           />
           {searchQuery.trim() ? (
@@ -274,44 +252,7 @@ export function SidebarProjectsSection({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-0.5 pb-1">
-        {isPureChat ? (
-          sortedThreadsFlat && sortedThreadsFlat.length === 0 ? (
-            <div className="mx-2 mt-2 rounded-lg px-2 py-2">
-              <p className="text-[15px] font-medium text-ds-muted">{t('sidebarEmptyTitle')}</p>
-              <p className="mt-1 text-[13px] leading-5 text-ds-faint">
-                {searchQuery.trim()
-                  ? t('sidebarSearchEmpty')
-                  : runtimeReady
-                    ? t('sidebarEmptySub')
-                    : t('sidebarEmptySubOffline')}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-0.5">
-              {(sortedThreadsFlat ?? []).map((thread) => (
-                <ThreadRow
-                  key={thread.id}
-                  thread={thread}
-                  active={activeThreadId === thread.id}
-                  deleting={deletingThreadIds[thread.id] === true}
-                  locale={locale}
-                  showRunning={
-                    thread.status?.trim().toLowerCase() === 'running' ||
-                    (activeThreadId === thread.id && busy) ||
-                    watchTurnCompletion[thread.id] === true
-                  }
-                  showUnread={
-                    unreadThreadIds[thread.id] === true && activeThreadId !== thread.id
-                  }
-                  onSelect={() => onSelectThread(thread.id)}
-                  onArchive={() => void handleArchiveThread(thread)}
-                  onDelete={() => void handleDeleteThread(thread)}
-                  onRestore={() => void handleRestoreThread(thread)}
-                />
-              ))}
-            </div>
-          )
-        ) : groups.length === 0 ? (
+        {groups.length === 0 ? (
           <SidebarEmpty
             runtimeReady={runtimeReady}
             hasWorkspace={!!workspaceRoot}

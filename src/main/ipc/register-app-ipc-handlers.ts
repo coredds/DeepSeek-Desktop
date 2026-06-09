@@ -4,11 +4,9 @@ import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { z } from 'zod'
-import type { AppSettingsPatch, AppSettingsV1, ClawRunResult, ClawTaskFromTextResult, ClawRuntimeStatus } from '../../shared/app-settings'
+import type { AppSettingsPatch, AppSettingsV1 } from '../../shared/app-settings'
 import type { DeepseekUpdateInfo, DeepseekUpdateInstallResult } from '../../shared/deepseek-update'
 import type {
-  ClawImInstallPollResult,
-  ClawImInstallQrResult,
   DeepseekRuntimeDiagnosticIssue,
   DeepseekRuntimeDiagnosticsResult,
   RuntimeRequestResult,
@@ -18,9 +16,6 @@ import type {
   WorkspacePickResult
 } from '../../shared/ds-gui-api'
 import {
-  clawMirrorPayloadSchema,
-  clawImInstallPollPayloadSchema,
-  clawTaskFromTextPayloadSchema,
   deepseekConfigContentSchema,
   defaultPathSchema,
   gitBranchPayloadSchema,
@@ -45,20 +40,15 @@ import {
   workspaceFileTargetPayloadSchema,
   workspaceFileWatchPayloadSchema,
   workspaceFileWritePayloadSchema,
-  writeExportPayloadSchema,
-  writeRichClipboardPayloadSchema,
-  writeInlineCompletionPayloadSchema,
   workspaceRootSchema,
   describeImagesPayloadSchema,
   exportMarkdownPayloadSchema
 } from './app-ipc-schemas'
 import type { JsonSettingsStore } from '../settings-store'
 import { getRuntimeBaseUrl } from '../settings-store'
-import type { ClawRuntime } from '../claw-runtime'
 import { findListeningProcessOnPort } from '../deepseek-process'
 import { createAndSwitchGitBranch, getGitBranches, switchGitBranch } from '../services/git-service'
 import { getWorkspaceHealth } from '../services/workspace-health-service'
-import { listTemplates } from '../services/template-service'
 import {
   createWorkspaceDirectory,
   createWorkspaceFile,
@@ -77,8 +67,6 @@ import {
   writeWorkspaceFile
 } from '../services/workspace-service'
 import type { createTerminalService } from '../services/terminal-service'
-import { requestWriteInlineCompletion } from '../services/write-inline-completion-service'
-import { copyWriteDocumentAsRichText, exportWriteDocument } from '../services/write-export-service'
 
 type TerminalService = ReturnType<typeof createTerminalService>
 
@@ -100,9 +88,6 @@ type RegisterAppIpcHandlersOptions = {
     body?: string
   ) => Promise<RuntimeRequestResult>
   fetchUpstreamModels: () => Promise<UpstreamModelsResult>
-  getClawRuntime: () => ClawRuntime | null
-  startFeishuInstallQrcode: (isLark: boolean) => Promise<ClawImInstallQrResult>
-  pollFeishuInstall: (deviceCode: string) => Promise<ClawImInstallPollResult>
   prepareDeepseekBinary: () => Promise<
     { ok: true; path: string } | { ok: false; message: string }
   >
@@ -301,9 +286,6 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     applySettingsPatch,
     runtimeRequest,
     fetchUpstreamModels,
-    getClawRuntime,
-    startFeishuInstallQrcode,
-    pollFeishuInstall,
     prepareDeepseekBinary,
     checkDeepseekUpdate,
     installDeepseekUpdate,
@@ -429,73 +411,6 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       diagnostics: images.map((img) => ({ name: img.name, ok: false, detail: 'vision endpoint unavailable' }))
     }
   })
-
-  ipcMain.handle('claw:status', async (): Promise<ClawRuntimeStatus> =>
-    getClawRuntime()?.status() ?? {
-      imServerRunning: false,
-      imUrl: '',
-      runningTaskIds: []
-    }
-  )
-
-  ipcMain.handle('claw:task:run', async (_, taskId: unknown): Promise<ClawRunResult> => {
-    const normalizedTaskId = parseIpcPayload('claw:task:run', streamIdSchema, taskId)
-    const clawRuntime = getClawRuntime()
-    if (!clawRuntime) return { ok: false, message: 'Claw runtime is not initialized.' }
-    return clawRuntime.runTask(normalizedTaskId)
-  })
-
-  ipcMain.handle(
-    'claw:channel:mirror-to-feishu',
-    async (_, payload: unknown) => {
-      const request = parseIpcPayload('claw:channel:mirror-to-feishu', clawMirrorPayloadSchema, payload)
-      const clawRuntime = getClawRuntime()
-      if (!clawRuntime) return { ok: false as const, message: 'Claw runtime is not initialized.' }
-      return clawRuntime.mirrorThreadMessageToFeishu(
-        request.threadId,
-        request.text,
-        request.direction
-      )
-    }
-  )
-
-  ipcMain.handle(
-    'claw:task:create-from-text',
-    async (_, payload: unknown): Promise<ClawTaskFromTextResult> => {
-      const request = parseIpcPayload(
-        'claw:task:create-from-text',
-        clawTaskFromTextPayloadSchema,
-        payload
-      )
-      const clawRuntime = getClawRuntime()
-      if (!clawRuntime) return { kind: 'error', message: 'Claw runtime is not initialized.' }
-      return clawRuntime.createScheduledTaskFromText(request.text, {
-        channelId: request.channelId,
-        modelHint: request.modelHint,
-        mode: request.mode
-      })
-    }
-  )
-
-  ipcMain.handle(
-    'claw:im-install:qrcode',
-    async (_, payload: unknown) => {
-      const request = parseIpcPayload(
-        'claw:im-install:qrcode',
-        z.object({ provider: z.literal('feishu'), isLark: z.boolean().optional() }).strict(),
-        payload
-      )
-      return startFeishuInstallQrcode(request.isLark === true)
-    }
-  )
-
-  ipcMain.handle(
-    'claw:im-install:poll',
-    async (_, payload: unknown) => {
-      const request = parseIpcPayload('claw:im-install:poll', clawImInstallPollPayloadSchema, payload)
-      return pollFeishuInstall(request.deviceCode)
-    }
-  )
 
   ipcMain.handle('deepseek:prepare-binary', async () => prepareDeepseekBinary())
   ipcMain.handle('deepseek:update-check', async () => checkDeepseekUpdate())
@@ -635,8 +550,6 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     getWorkspaceHealth(parseIpcPayload('workspace:health', workspaceRootSchema, workspaceRoot))
   )
 
-  ipcMain.handle('templates:list', async () => listTemplates())
-
   ipcMain.handle('editor:list', async () => listEditorsResult())
   ipcMain.handle('editor:open-path', async (_, payload: unknown) =>
     openEditorPath(parseIpcPayload('editor:open-path', openEditorPathPayloadSchema, payload))
@@ -771,24 +684,6 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('file:unwatch-workspace', async (_, watchId: unknown) =>
     disposeWorkspaceFileWatch(parseIpcPayload('file:unwatch-workspace', streamIdSchema, watchId))
   )
-  ipcMain.handle('write:export', async (_, payload: unknown) =>
-    exportWriteDocument(
-      parseIpcPayload('write:export', writeExportPayloadSchema, payload),
-      { parentWindow: getMainWindow() }
-    )
-  )
-  ipcMain.handle('write:copy-rich-text', async (_, payload: unknown) =>
-    copyWriteDocumentAsRichText(
-      parseIpcPayload('write:copy-rich-text', writeRichClipboardPayloadSchema, payload)
-    )
-  )
-  ipcMain.handle('write:inline-completion', async (_, payload: unknown) =>
-    requestWriteInlineCompletion(
-      await store.load(),
-      parseIpcPayload('write:inline-completion', writeInlineCompletionPayloadSchema, payload)
-    )
-  )
-
   ipcMain.handle('shell:open-external', async (_, url: unknown) => {
     const validatedUrl = parseIpcPayload('shell:open-external', shellOpenExternalUrlSchema, url)
     await shell.openExternal(validatedUrl)

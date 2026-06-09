@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ChevronRight,
@@ -10,22 +10,12 @@ import {
 } from 'lucide-react'
 import type { NormalizedThread } from '../../agent/types'
 import { useChatStore, type SettingsRouteSection } from '../../store/chat-store'
-import type {
-  ClawImChannelV1,
-} from '@shared/app-settings'
-import {
-  ClawSidebarContent
-} from './SidebarClaw'
-import type { ClawImDialogMode } from './SidebarClawDialogHelpers'
-import { ClawAddImDialog } from './SidebarClawDialog'
+import deepseekLogo from '../../asset/deepseek.png'
 import { SidebarProjectsSection } from './SidebarProjectsSection'
-import { WorkspaceModeTabs } from './WorkspaceModeTabs'
 
 type Props = {
   threads: NormalizedThread[]
   activeThreadId: string | null
-  activeView: 'chat-pure' | 'chat' | 'write' | 'claw'
-  pluginsActive: boolean
   runtimeReady: boolean
   threadSearch: string
   showArchivedThreads: boolean
@@ -39,17 +29,11 @@ type Props = {
   onNewChatInWorkspace: (workspaceRoot: string) => void
   onOpenSettings: (section?: SettingsRouteSection) => void
   onOpenPlugins: () => void
-  onPureChatOpen: () => void
-  onCodeOpen: () => void
-  onWriteOpen: () => void
-  onClawOpen: () => void
 }
 
 export function Sidebar({
   threads,
   activeThreadId,
-  activeView,
-  pluginsActive,
   runtimeReady,
   threadSearch,
   showArchivedThreads,
@@ -62,11 +46,7 @@ export function Sidebar({
   onNewChat,
   onNewChatInWorkspace,
   onOpenSettings,
-  onOpenPlugins,
-  onPureChatOpen,
-  onCodeOpen,
-  onWriteOpen,
-  onClawOpen
+  onOpenPlugins
 }: Props): ReactElement {
   const { t, i18n } = useTranslation('common')
   const workspaceRoot = useChatStore((s) => s.workspaceRoot)
@@ -75,20 +55,8 @@ export function Sidebar({
   const busy = useChatStore((s) => s.busy)
   const watchTurnCompletion = useChatStore((s) => s.watchTurnCompletion)
   const unreadThreadIds = useChatStore((s) => s.unreadThreadIds)
-  const clawChannels = useChatStore((s) => s.clawChannels)
-  const activeClawChannelId = useChatStore((s) => s.activeClawChannelId)
-  const selectClawChannel = useChatStore((s) => s.selectClawChannel)
-  const addClawChannel = useChatStore((s) => s.addClawChannel)
-  const deleteClawChannel = useChatStore((s) => s.deleteClawChannel)
-  const resetClawChannelSession = useChatStore((s) => s.resetClawChannelSession)
 
   const [appVersion, setAppVersion] = useState('')
-  const [imDialogMode, setImDialogMode] = useState<ClawImDialogMode | null>(null)
-
-  const activeClawChannel = useMemo(
-    () => clawChannels.find((channel) => channel.id === activeClawChannelId) ?? clawChannels[0] ?? null,
-    [clawChannels, activeClawChannelId]
-  )
 
   useEffect(() => {
     let cancelled = false
@@ -109,23 +77,11 @@ export function Sidebar({
       <div className="shrink-0 px-1 pb-2 pt-3">
         <div aria-hidden className="ds-titlebar-safe-block" />
         <div className="flex min-h-8 items-center justify-center px-1 pt-1">
-          <div className="truncate text-center text-[17px] font-semibold tracking-[-0.025em] text-accent">
-            {t('appName')}
-          </div>
+          <img src={deepseekLogo} alt="" className="h-7 w-7" />
         </div>
-        <div className="mx-1 mt-4 border-t border-ds-border-muted/20" />
       </div>
 
       <div className="ds-no-drag flex flex-col px-1">
-        <WorkspaceModeTabs
-          activeView={activeView}
-          onPureChatOpen={onPureChatOpen}
-          onCodeOpen={onCodeOpen}
-          onWriteOpen={onWriteOpen}
-          onClawOpen={onClawOpen}
-        />
-
-        {activeView !== 'claw' ? (
         <SidebarLink
           icon={<Plus className="h-4 w-4" strokeWidth={2} />}
           label={t('newAgent')}
@@ -135,33 +91,17 @@ export function Sidebar({
           shortcut="⌘N"
           variant="flat-accent"
         />
-        ) : null}
         <SidebarLink
           icon={<LayoutGrid className="h-4 w-4" strokeWidth={1.75} />}
           label={t('plugins')}
           onClick={onOpenPlugins}
-          active={pluginsActive}
         />
       </div>
 
       <div className="ds-no-drag mx-1 my-3" />
 
-      {activeView === 'claw' ? (
-        <ClawSidebarContent
-          channels={clawChannels}
-          activeChannelId={activeClawChannelId}
-          activeThreadId={activeThreadId}
-          runtimeReady={runtimeReady}
-          onSelectChannel={(channelId) => void selectClawChannel(channelId)}
-          onAddChannel={() => setImDialogMode('add')}
-          onResetChannel={(channelId) => void resetClawChannelSession(channelId)}
-          onOpenSettings={() => setImDialogMode('edit')}
-          t={t}
-        />
-      ) : (
       <SidebarProjectsSection
         threads={threads}
-        activeView={activeView}
         activeThreadId={activeThreadId}
         runtimeReady={runtimeReady}
         searchQuery={threadSearch}
@@ -182,7 +122,6 @@ export function Sidebar({
         onShowArchivedChange={onShowArchivedThreadsChange}
         t={t}
       />
-      )}
 
       <div className="ds-no-drag mt-2 border-t border-ds-border-muted/20 px-1 pt-3">
         <SidebarLink
@@ -195,21 +134,6 @@ export function Sidebar({
       </div>
 
     </aside>
-
-    {imDialogMode ? (
-      <ClawAddImDialog
-        mode={imDialogMode}
-        initialProvider={activeClawChannel?.provider}
-        initialChannelId={imDialogMode === 'edit' ? activeClawChannel?.id : undefined}
-        channels={clawChannels}
-        onClose={() => setImDialogMode(null)}
-        onAddProvider={(provider, agentProfile, platformCredential, options) =>
-          addClawChannel(provider, agentProfile, platformCredential, options)
-        }
-        onDeleteChannel={(channelId) => deleteClawChannel(channelId)}
-        t={t}
-      />
-    ) : null}
     </>
   )
 }

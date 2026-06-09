@@ -7,12 +7,10 @@ import {
   Clock3,
   GitFork,
   Gauge,
-  Lightbulb,
   ListTodo,
   Minimize2,
   Paperclip,
   RotateCcw,
-  Search,
   Send,
   Square,
   X
@@ -56,10 +54,6 @@ type Props = {
   onSend: () => void
   onInterrupt: () => void
   onOpenRuntimePanel?: () => void
-  deepThink: boolean
-  setDeepThink: (v: boolean) => void
-  smartSearch: boolean
-  setSmartSearch: (v: boolean) => void
 }
 
 type SlashCommandId = 'plan' | 'agent' | 'compact' | 'fork' | 'archive' | 'restore' | 'runtime' | 'usage'
@@ -101,22 +95,15 @@ export function FloatingComposer({
   onAttachmentsChange,
   onSend,
   onInterrupt,
-  onOpenRuntimePanel,
-  deepThink,
-  setDeepThink,
-  smartSearch,
-  setSmartSearch
+  onOpenRuntimePanel
 }: Props): ReactElement {
   const { t } = useTranslation('common')
-  const route = useChatStore((s) => s.route)
   const workspaceRoot = useChatStore((s) => s.workspaceRoot)
   const activeThreadId = useChatStore((s) => s.activeThreadId)
   const threads = useChatStore((s) => s.threads)
   const compactActiveThread = useChatStore((s) => s.compactActiveThread)
   const forkActiveThread = useChatStore((s) => s.forkActiveThread)
   const archiveThread = useChatStore((s) => s.archiveThread)
-  const clawChannels = useChatStore((s) => s.clawChannels)
-  const activeClawChannelId = useChatStore((s) => s.activeClawChannelId)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const composingRef = useRef(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -127,10 +114,6 @@ export function FloatingComposer({
   const [dragOver, setDragOver] = useState(false)
   const compact = variant === 'compact'
   const modelPickerRef = useRef<HTMLElement | null>(null)
-  const activeClawChannel = useMemo(
-    () => clawChannels.find((channel) => channel.id === activeClawChannelId) ?? null,
-    [activeClawChannelId, clawChannels]
-  )
   const activeThreadWorkspace = activeThreadId
     ? threads.find((thread) => thread.id === activeThreadId)?.workspace
     : ''
@@ -138,7 +121,7 @@ export function FloatingComposer({
     ? threads.find((thread) => thread.id === activeThreadId) ?? null
     : null
   const activeThreadArchived = activeThread?.archived === true
-  const showThreadUsageFooter = !compact && (route === 'chat' || route === 'chat-pure') && Boolean(activeThreadId) && runtimeReady
+  const showThreadUsageFooter = !compact && Boolean(activeThreadId) && runtimeReady
   const threadUsageState = useThreadUsageState(
     activeThreadId,
     showThreadUsageFooter,
@@ -146,19 +129,8 @@ export function FloatingComposer({
   )
   const threadUsage = threadUsageState.usage
   const effectiveWorkspaceRoot = normalizeWorkspaceRoot(activeThreadWorkspace || workspaceRootOverride || workspaceRoot)
-  const clawAgentName =
-    activeClawChannel?.agentProfile.name.trim()
-    || activeClawChannel?.label.trim()
-    || t('clawEmptyHeroFallbackName')
-  const clawHasInboundConversation = Boolean(
-    activeClawChannel?.conversations.length || activeClawChannel?.remoteSession?.chatId?.trim()
-  )
 
-  const canCompose = runtimeReady && (
-    route === 'claw'
-      ? clawHasInboundConversation
-      : true
-  )
+  const canCompose = runtimeReady
   const canChangeModel = canCompose && !busy
   const canSend = canCompose && input.trim().length > 0
   const slashQuery = getSlashQuery(input)
@@ -175,42 +147,20 @@ export function FloatingComposer({
   }, [composerModel, composerPickList])
   const placeholder = !runtimeReady
     ? t('runtimeActionNeedsConnection')
-    : route === 'chat-pure'
-      ? busy
-        ? t('composerQueuePlaceholder')
-        : mode === 'plan'
-        ? t('composerPlanPlaceholder')
-        : hasActiveThread
-          ? t('placeholder')
-          : t('composerStartsThread')
-      : !hasActiveThread && !effectiveWorkspaceRoot
-        ? t('workspaceRequiredToCreateThread')
-        : busy
-          ? t('composerQueuePlaceholder')
-          : mode === 'plan'
-          ? t('composerPlanPlaceholder')
-          : route === 'claw'
-              ? clawHasInboundConversation
-                ? t('clawPlaceholder', { name: clawAgentName })
-                : t('clawPlaceholderNeedsInbound')
-              : hasActiveThread
-              ? t('placeholder')
-              : t('composerStartsThread')
+    : busy
+      ? t('composerQueuePlaceholder')
+      : mode === 'plan'
+      ? t('composerPlanPlaceholder')
+      : hasActiveThread
+        ? t('placeholder')
+        : t('composerStartsThread')
   const footerHint = !runtimeReady
     ? t('composerOfflineHint')
-    : route === 'chat-pure'
-      ? mode === 'plan'
+    : !hasActiveThread && !effectiveWorkspaceRoot
+      ? t('composerWorkspaceHint')
+      : mode === 'plan'
         ? t('planModeActiveHint')
         : t('composerSlashHint')
-      : !hasActiveThread && !effectiveWorkspaceRoot
-        ? t('composerWorkspaceHint')
-        : mode === 'plan'
-          ? t('planModeActiveHint')
-          : route === 'claw'
-            ? clawHasInboundConversation
-              ? t('clawComposerHint')
-              : t('clawComposerHintNeedsInbound')
-            : t('composerSlashHint')
   const slashCommands = useMemo<SlashCommand[]>(() => {
     const threadActionDisabled = !runtimeReady || busy || !activeThreadId
     const commands: SlashCommand[] = [
@@ -236,27 +186,26 @@ export function FloatingComposer({
       })
     }
 
-    if (route !== 'claw') {
-      commands.push(
-        {
-          id: 'compact',
-          title: t('slashCommandCompactTitle'),
-          description: t('slashCommandCompactDescription'),
-          keywords: ['compact', 'summarize', 'compress'],
-          icon: <Minimize2 className="h-4 w-4" strokeWidth={1.9} />,
-          disabled: threadActionDisabled
-        },
-        {
-          id: 'fork',
-          title: t('slashCommandForkTitle'),
-          description: t('slashCommandForkDescription'),
-          keywords: ['fork', 'branch', 'copy'],
-          icon: <GitFork className="h-4 w-4" strokeWidth={1.9} />,
-          disabled: threadActionDisabled
-        }
-      )
+    commands.push(
+      {
+        id: 'compact',
+        title: t('slashCommandCompactTitle'),
+        description: t('slashCommandCompactDescription'),
+        keywords: ['compact', 'summarize', 'compress'],
+        icon: <Minimize2 className="h-4 w-4" strokeWidth={1.9} />,
+        disabled: threadActionDisabled
+      },
+      {
+        id: 'fork',
+        title: t('slashCommandForkTitle'),
+        description: t('slashCommandForkDescription'),
+        keywords: ['fork', 'branch', 'copy'],
+        icon: <GitFork className="h-4 w-4" strokeWidth={1.9} />,
+        disabled: threadActionDisabled
+      }
+    )
 
-      if (activeThreadArchived) {
+    if (activeThreadArchived) {
         commands.push({
           id: 'restore',
           title: t('slashCommandRestoreTitle'),
@@ -275,7 +224,6 @@ export function FloatingComposer({
           disabled: threadActionDisabled
         })
       }
-    }
 
     commands.push(
       {
@@ -297,7 +245,7 @@ export function FloatingComposer({
     )
 
     return commands
-  }, [activeThreadArchived, activeThreadId, busy, mode, onOpenRuntimePanel, route, runtimeReady, t])
+  }, [activeThreadArchived, activeThreadId, busy, mode, onOpenRuntimePanel, runtimeReady, t])
 
   const filteredSlashCommands = useMemo(() => {
     if (slashQuery == null) return []
@@ -691,40 +639,7 @@ export function FloatingComposer({
             </div>
           ) : null}
 
-          {variant !== 'compact' && route !== 'claw' ? (
-            <div className="flex items-center gap-2 px-1 pt-1">
-              <button
-                type="button"
-                onClick={() => setDeepThink(!deepThink)}
-                className={
-                  deepThink
-                    ? 'ds-chip-active ds-no-drag inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-semibold text-ds-ink transition hover:brightness-105'
-                    : 'ds-chip-muted ds-no-drag inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-medium text-ds-muted transition hover:text-ds-ink'
-                }
-                title={t('deepThinkTooltip')}
-                aria-label={t('deepThink')}
-                aria-pressed={deepThink}
-              >
-                <Lightbulb className={`h-3.5 w-3.5 ${deepThink ? 'text-accent' : ''}`} strokeWidth={2} />
-                <span>{t('deepThink')}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSmartSearch(!smartSearch)}
-                className={
-                  smartSearch
-                    ? 'ds-chip-active ds-no-drag inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-semibold text-ds-ink transition hover:brightness-105'
-                    : 'ds-chip-muted ds-no-drag inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-medium text-ds-muted transition hover:text-ds-ink'
-                }
-                title={t('smartSearchTooltip')}
-                aria-label={t('smartSearch')}
-                aria-pressed={smartSearch}
-              >
-                <Search className={`h-3.5 w-3.5 ${smartSearch ? 'text-accent' : ''}`} strokeWidth={2} />
-                <span>{t('smartSearch')}</span>
-              </button>
-            </div>
-          ) : null}
+          {variant !== 'compact' ? null : null}
 
           <div className="flex items-end gap-3">
             <textarea

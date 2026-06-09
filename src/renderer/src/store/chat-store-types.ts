@@ -6,14 +6,6 @@ import type {
   RuntimeConnectionStatus,
   UserInputAnswer
 } from '../agent/types'
-import type {
-  ClawImAgentProfileV1,
-  ClawImChannelV1,
-  ClawImPlatformCredentialV1,
-  ClawImProvider,
-  ClawImSettingsV1,
-  ClawModel
-} from '@shared/app-settings'
 
 export type QueuedUserMessage = {
   id: string
@@ -35,7 +27,7 @@ export type SendMessageOverrides = {
 }
 
 export type InitialSetupMode = 'required' | 'preview'
-export type SettingsRouteSection = 'general' | 'write' | 'agents' | 'skill' | 'mcp' | 'claw'
+export type SettingsRouteSection = 'general' | 'agents' | 'skill' | 'mcp'
 export type MessageSearchResult = {
   threadId: string
   threadTitle: string
@@ -45,13 +37,11 @@ export type MessageSearchResult = {
   matchIndex: number
 }
 
-export type AppRoute = 'chat' | 'chat-pure' | 'write' | 'settings' | 'plugins' | 'claw'
-export type PluginHostRoute = 'chat' | 'chat-pure' | 'claw'
+export type AppRoute = 'chat' | 'settings' | 'plugins'
 
 export type ChatState = {
   route: AppRoute
-  settingsReturnRoute: Exclude<AppRoute, 'settings'>
-  pluginHostRoute: PluginHostRoute
+  settingsReturnRoute: 'chat' | 'plugins'
   settingsSection: SettingsRouteSection
   initialSetupOpen: boolean
   initialSetupMode: InitialSetupMode
@@ -85,40 +75,13 @@ export type ChatState = {
   messageSearchQuery: string
   messageSearchResults: MessageSearchResult[]
   isSearchingMessages: boolean
-  clawChannels: ClawImChannelV1[]
-  activeClawChannelId: string
-  appendLocalClawTurn: (userText: string, replyText: string) => void
   setError: (message: string | null) => void
   setComposerModel: (modelId: string) => void
   loadComposerModels: () => Promise<void>
   setRoute: (r: AppRoute) => void
-  openWrite: () => Promise<void>
   openCode: () => Promise<void>
-  openPureChat: () => Promise<void>
-  ensureWriteThreadForWorkspace: (workspaceRoot?: string) => Promise<string | null>
-  createWriteThread: (workspaceRoot?: string) => Promise<string | null>
-  selectWriteThread: (threadId: string, workspaceRoot?: string) => Promise<void>
   openSettings: (section?: SettingsRouteSection) => void
-  openPlugins: (host?: PluginHostRoute) => void
-  openClaw: () => void
-  refreshClawChannels: () => Promise<void>
-  addClawChannel: (
-    provider: ClawImProvider,
-    agentProfile?: Partial<ClawImAgentProfileV1>,
-    platformCredential?: ClawImPlatformCredentialV1,
-    options?: {
-      channelId?: string
-      model?: ClawModel
-      workspaceRoot?: string
-      enabled?: boolean
-      im?: Partial<ClawImSettingsV1>
-    }
-  ) => Promise<void>
-  selectClawChannel: (channelId: string) => Promise<void>
-  selectClawConversation: (channelId: string, threadId: string) => Promise<void>
-  deleteClawChannel: (channelId: string) => Promise<void>
-  resetClawChannelSession: (channelId: string) => Promise<void>
-  setClawChannelModel: (channelId: string, model: string) => Promise<void>
+  openPlugins: () => void
   openInitialSetup: (mode?: InitialSetupMode) => void
   closeInitialSetup: () => void
   boot: () => Promise<void>

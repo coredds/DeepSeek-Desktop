@@ -57,6 +57,7 @@
   "clawLastStatus": "Last status",
   "clawLastThread": "Last thread",
   "sectionGeneral": "General",
+  "settingsFooter": "Local AI desktop",
   "sectionWrite": "Write mode",
   "language": "Language",
   "languageDesc": "Applied immediately when selected.",

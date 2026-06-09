@@ -1,6 +1,6 @@
 import type i18next from 'i18next'
 import type { AppSettingsV1 } from '@shared/app-settings'
-import type { ChatState, ChatStoreGet, ChatStoreSet, InitialSetupMode, PluginHostRoute, SettingsRouteSection } from './chat-store-types'
+import type { ChatState, ChatStoreGet, ChatStoreSet, InitialSetupMode, SettingsRouteSection } from './chat-store-types'
 
 type CreateAppActionsOptions = {
   set: ChatStoreSet
@@ -23,11 +23,8 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
   | 'setComposerModel'
   | 'loadComposerModels'
   | 'setRoute'
-  | 'openWrite'
   | 'openSettings'
   | 'openPlugins'
-  | 'openClaw'
-  | 'openPureChat'
   | 'openInitialSetup'
   | 'closeInitialSetup'
   | 'selectInspectorItem'
@@ -82,10 +79,6 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
 
     setRoute: (route) => set({ route }),
 
-    openWrite: async () => {
-      set({ route: 'write' })
-    },
-
     openSettings: (section: SettingsRouteSection = 'general') =>
       set((state) => ({
         route: 'settings',
@@ -93,20 +86,8 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
         settingsReturnRoute: state.route === 'settings' ? state.settingsReturnRoute : state.route
       })),
 
-    openPlugins: (host?: PluginHostRoute) =>
-      set((state) => ({
-        route: 'plugins',
-        pluginHostRoute: host ?? (state.route === 'claw' ? 'claw' : state.route === 'chat-pure' ? 'chat-pure' : 'chat')
-      })),
-
-    openClaw: () => {
-      set({ route: 'claw' })
-      void get().refreshClawChannels()
-    },
-
-    openPureChat: async () => {
-      set({ route: 'chat-pure' })
-    },
+    openPlugins: () =>
+      set({ route: 'plugins' }),
 
     openInitialSetup: (mode: InitialSetupMode = 'required') =>
       set({ initialSetupOpen: true, initialSetupMode: mode }),
@@ -128,11 +109,7 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
       set({
         providerId: settings.agentProvider,
         workspaceRoot,
-        workspaceLabel: workspaceLabelFromPath(workspaceRoot),
-        clawChannels: settings.claw.channels,
-        activeClawChannelId: settings.claw.channels.some((channel) => channel.id === get().activeClawChannelId)
-          ? get().activeClawChannelId
-          : settings.claw.channels[0]?.id ?? ''
+        workspaceLabel: workspaceLabelFromPath(workspaceRoot)
       })
       await get().applyI18nFromSettings(settings.locale)
       if (get().runtimeConnection === 'ready') {

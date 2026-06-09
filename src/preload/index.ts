@@ -11,13 +11,6 @@ const api = {
   fetchUpstreamModels: () => ipcRenderer.invoke('upstream:models'),
   describeImages: (images) =>
     ipcRenderer.invoke('vision:describe', { images }),
-  getClawStatus: () => ipcRenderer.invoke('claw:status'),
-  runClawTask: (taskId) =>
-    ipcRenderer.invoke('claw:task:run', taskId),
-  startClawImInstallQr: (provider, options) =>
-    ipcRenderer.invoke('claw:im-install:qrcode', { provider, isLark: options?.isLark }),
-  pollClawImInstall: (provider, deviceCode) =>
-    ipcRenderer.invoke('claw:im-install:poll', { provider, deviceCode }),
   deepseekSpawnIfNeeded: () =>
     ipcRenderer.invoke('deepseek:spawn-if-needed'),
   prepareDeepseekBinary: () => ipcRenderer.invoke('deepseek:prepare-binary'),
@@ -47,8 +40,6 @@ const api = {
     ipcRenderer.invoke('git:create-and-switch-branch', { workspaceRoot, branch }),
   getWorkspaceHealth: (workspaceRoot) =>
     ipcRenderer.invoke('workspace:health', workspaceRoot),
-  listTemplates: () =>
-    ipcRenderer.invoke('templates:list'),
   listEditors: () => ipcRenderer.invoke('editor:list'),
   openEditorPath: (options) =>
     ipcRenderer.invoke('editor:open-path', options),
@@ -108,12 +99,6 @@ const api = {
     ipcRenderer.on('file:workspace-changed', wrapped)
     return () => ipcRenderer.removeListener('file:workspace-changed', wrapped)
   },
-  exportWriteDocument: (payload) =>
-    ipcRenderer.invoke('write:export', payload),
-  copyWriteDocumentAsRichText: (payload) =>
-    ipcRenderer.invoke('write:copy-rich-text', payload),
-  requestWriteInlineCompletion: (payload) =>
-    ipcRenderer.invoke('write:inline-completion', payload),
   startSse: (threadId, sinceSeq, streamId) =>
     ipcRenderer.invoke('runtime:sse:start', { threadId, sinceSeq, streamId }),
   stopSse: (streamId) => ipcRenderer.invoke('runtime:sse:stop', streamId),
@@ -141,23 +126,6 @@ const api = {
     ipcRenderer.on('runtime:sse-error', wrapped)
     return () => ipcRenderer.removeListener('runtime:sse-error', wrapped)
   },
-  onClawChannelActivity: (handler) => {
-    const wrapped = (
-      _: Electron.IpcRendererEvent,
-      payload: Parameters<typeof handler>[0]
-    ) => handler(payload)
-    ipcRenderer.on('claw:channel-activity', wrapped)
-    return () => ipcRenderer.removeListener('claw:channel-activity', wrapped)
-  },
-  mirrorClawChannelMessageToFeishu: (threadId, text, direction) =>
-    ipcRenderer.invoke('claw:channel:mirror-to-feishu', { threadId, text, direction }),
-  createClawTaskFromText: (text, options) =>
-    ipcRenderer.invoke('claw:task:create-from-text', {
-      text,
-      channelId: options?.channelId,
-      modelHint: options?.modelHint,
-      mode: options?.mode
-    }),
   focusWindow: () => ipcRenderer.invoke('window:focus'),
   openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
   showTurnCompleteNotification: (payload) => ipcRenderer.invoke('notification:turn-complete', payload),

@@ -1,19 +1,8 @@
 import type { ChatBlock } from '../agent/types'
 import { DEFAULT_COMPOSER_MODEL_IDS } from '@shared/default-composer-models'
-import {
-  CLAW_MODEL_IDS,
-  type ClawImAgentProfileV1,
-  type ClawImChannelV1,
-  type ClawImPlatformCredentialV1,
-  type ClawImProvider,
-  type ClawModel
-} from '@shared/app-settings'
-import type { ChatState } from './chat-store-types'
 
 const COMPOSER_MODEL_STORAGE_KEY = 'deepseekdesktop.composerModel'
 const TURN_MODEL_STORAGE_KEY = 'deepseekdesktop.turnModelLabel'
-
-export const CLAW_COMPOSER_MODEL_IDS = [...CLAW_MODEL_IDS]
 
 export function readStoredComposerModel(allowedIds: readonly string[]): string {
   try {
@@ -50,47 +39,6 @@ export function mergeComposerPickList(upstreamOk: boolean, upstreamIds: string[]
   return ['auto', ...tail]
 }
 
-export function newClawChannel(
-  provider: ClawImProvider,
-  agentProfile?: Partial<ClawImAgentProfileV1>,
-  platformCredential?: ClawImPlatformCredentialV1
-): ClawImChannelV1 {
-  const now = new Date().toISOString()
-  const fallbackId = `im-${provider}-${Date.now()}`
-  const profileName = agentProfile?.name?.trim() ?? ''
-  return {
-    id: globalThis.crypto?.randomUUID?.() ?? fallbackId,
-    provider,
-    label: profileName || defaultClawProviderLabel(provider),
-    enabled: true,
-    model: 'auto',
-    threadId: '',
-    workspaceRoot: '',
-    conversations: [],
-    agentProfile: {
-      name: profileName,
-      description: agentProfile?.description?.trim() ?? '',
-      identity: agentProfile?.identity ?? '',
-      personality: agentProfile?.personality ?? '',
-      userContext: agentProfile?.userContext ?? '',
-      replyRules: agentProfile?.replyRules ?? ''
-    },
-    ...(platformCredential ? { platformCredential } : {}),
-    createdAt: now,
-    updatedAt: now
-  }
-}
-
-export function normalizeClawComposerModel(raw: string): ClawModel {
-  return raw === 'deepseek-v4-pro' || raw === 'deepseek-v4-flash' ? raw : 'auto'
-}
-
-export function activeClawChannel(
-  state: Pick<ChatState, 'clawChannels' | 'activeClawChannelId'>
-): ClawImChannelV1 | null {
-  return state.clawChannels.find((channel) => channel.id === state.activeClawChannelId) ?? null
-}
-
 export function optimisticUserModelLabel(
   composerModel: string,
   threadModel: string | undefined
@@ -122,11 +70,6 @@ export function hydrateBlockModelLabels(threadId: string, blocks: ChatBlock[]): 
     return { ...block, modelLabel: label }
   })
   return changed ? next : blocks
-}
-
-function defaultClawProviderLabel(provider: ClawImProvider): string {
-  void provider
-  return 'Feishu / Lark'
 }
 
 function loadTurnModelMap(): Record<string, string> {

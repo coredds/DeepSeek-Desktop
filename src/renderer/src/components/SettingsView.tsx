@@ -2,26 +2,8 @@ import type { ReactElement, ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  CLAW_MODEL_IDS,
-  DEFAULT_WRITE_INLINE_COMPLETION_BASE_URL,
-  DEFAULT_WRITE_INLINE_COMPLETION_MAX_TOKENS,
-  DEFAULT_WRITE_INLINE_COMPLETION_MODEL,
-  DEFAULT_WRITE_INLINE_LONG_COMPLETION_DEBOUNCE_MS,
-  DEFAULT_WRITE_INLINE_LONG_COMPLETION_MAX_TOKENS,
-  WRITE_INLINE_COMPLETION_MODEL_IDS,
-  DEFAULT_WRITE_WORKSPACE_ROOT,
-  DEFAULT_CLAW_MODEL,
-  mergeClawSettings,
-  mergeWriteSettings,
-  normalizeClawSettings,
-  normalizeWriteSettings,
   type ApprovalPolicy,
   type AppSettingsV1,
-  type ClawRunMode,
-  type ClawScheduleKind,
-  type ClawSettingsPatchV1,
-  type ClawTaskV1,
-  type WriteSettingsPatchV1,
   type SandboxMode
 } from '@shared/app-settings'
 import type { DeepseekUpdateInfo, DeepseekUpdateInstallResult } from '@shared/deepseek-update'
@@ -36,12 +18,8 @@ import {
   FolderOpen,
   Globe,
   Loader2,
-  PencilLine,
-  Plus,
-  RadioTower,
   RefreshCw,
-  Settings,
-  Trash2
+  Settings
 } from 'lucide-react'
 import { applyTheme, applyUiFontScale } from '../lib/apply-theme'
 import { formatWorkspacePickerError } from '../lib/format-workspace-picker-error'
@@ -54,14 +32,12 @@ import {
 import { normalizeWorkspaceRoot } from '../lib/workspace-path'
 import { useChatStore, type SettingsRouteSection } from '../store/chat-store'
 
-type SettingsCategory = 'general' | 'write' | 'agents' | 'claw'
+type SettingsCategory = 'general' | 'agents'
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
-type SettingsPatch = Partial<Omit<AppSettingsV1, 'deepseek' | 'log' | 'notifications' | 'write' | 'claw'>> & {
+type SettingsPatch = Partial<Omit<AppSettingsV1, 'deepseek' | 'log' | 'notifications'>> & {
   deepseek?: Partial<AppSettingsV1['deepseek']>
   log?: Partial<AppSettingsV1['log']>
   notifications?: Partial<AppSettingsV1['notifications']>
-  write?: WriteSettingsPatchV1
-  claw?: ClawSettingsPatchV1
 }
 type SkillRootOption = {
   id: SkillRootId
@@ -73,101 +49,17 @@ type InlineNotice = {
   tone: 'success' | 'error' | 'info'
   message: string
 }
-type RendererSettingsShape = Partial<Omit<AppSettingsV1, 'deepseek' | 'log' | 'notifications' | 'write' | 'claw'>> & {
+type RendererSettingsShape = Partial<Omit<AppSettingsV1, 'deepseek' | 'log' | 'notifications'>> & {
   deepseek?: Partial<AppSettingsV1['deepseek']>
   log?: Partial<AppSettingsV1['log']>
   notifications?: Partial<AppSettingsV1['notifications']>
-  write?: WriteSettingsPatchV1
-  claw?: ClawSettingsPatchV1
 }
 
 const DEFAULT_WORKSPACE_ROOT = '~/.deepseekdesktop/default_workspace'
-const CLAW_MODE_OPTIONS: Array<{ id: ClawRunMode; key: string }> = [
-  { id: 'agent', key: 'clawModeAgent' },
-  { id: 'plan', key: 'clawModePlan' }
-]
-
-function splitSettingsList(raw: string): string[] {
-  return raw
-    .split(/[\n,]/)
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-
-function listSettingsText(values: string[]): string {
-  return values.join('\n')
-}
-
-function newClawTask(workspaceRoot: string): ClawTaskV1 {
-  const now = new Date().toISOString()
-  return {
-    id: globalThis.crypto?.randomUUID?.() ?? `task-${Date.now()}`,
-    title: 'New Claw task',
-    enabled: true,
-    prompt: '',
-    workspaceRoot,
-    model: DEFAULT_CLAW_MODEL,
-    mode: 'agent',
-    schedule: {
-      kind: 'manual',
-      everyMinutes: 60,
-      timeOfDay: '09:00',
-      atTime: ''
-    },
-    createdAt: now,
-    updatedAt: now,
-    lastRunAt: '',
-    nextRunAt: '',
-    lastStatus: 'idle',
-    lastMessage: '',
-    lastThreadId: ''
-  }
-}
-
-function clawScheduleSummary(
-  task: ClawTaskV1,
-  t: (key: string, values?: Record<string, unknown>) => string
-): string {
-  if (task.schedule.kind === 'at') {
-    return t('clawScheduleAt', {
-      datetime: task.schedule.atTime ? new Date(task.schedule.atTime).toLocaleString() : '—'
-    })
-  }
-  if (task.schedule.kind === 'interval') {
-    return t('clawScheduleEvery', { minutes: task.schedule.everyMinutes })
-  }
-  if (task.schedule.kind === 'daily') {
-    return t('clawScheduleDaily', { time: task.schedule.timeOfDay })
-  }
-  return t('clawScheduleManual')
-}
 
 function hasValidPort(settings: AppSettingsV1): boolean {
   const port = settings.deepseek.port
   return Number.isFinite(port) && port >= 1 && port <= 65535
-}
-
-function dateTimeLocalValueFromIso(value: string): string {
-  const date = new Date(value)
-  if (!Number.isFinite(date.getTime())) return ''
-  const pad = (part: number): string => String(part).padStart(2, '0')
-  return [
-    date.getFullYear(),
-    '-',
-    pad(date.getMonth() + 1),
-    '-',
-    pad(date.getDate()),
-    'T',
-    pad(date.getHours()),
-    ':',
-    pad(date.getMinutes())
-  ].join('')
-}
-
-function isoFromDateTimeLocalValue(value: string): string {
-  if (!value.trim()) return ''
-  const date = new Date(value)
-  return Number.isFinite(date.getTime()) ? date.toISOString() : ''
 }
 
 function mergeSettings(current: AppSettingsV1, patch: SettingsPatch): AppSettingsV1 {
@@ -186,9 +78,7 @@ function mergeSettings(current: AppSettingsV1, patch: SettingsPatch): AppSetting
     notifications: {
       ...safeCurrent.notifications,
       ...(patch.notifications ?? {})
-    },
-    write: mergeWriteSettings(safeCurrent.write, patch.write),
-    claw: mergeClawSettings(safeCurrent.claw, patch.claw)
+    }
   }
 }
 
@@ -202,9 +92,7 @@ function coerceRendererSettings(settings: AppSettingsV1): AppSettingsV1 {
     },
     notifications: {
       turnComplete: raw.notifications?.turnComplete !== false
-    },
-    write: normalizeWriteSettings(raw.write),
-    claw: normalizeClawSettings(raw.claw)
+    }
   }
 }
 
@@ -215,8 +103,6 @@ export function SettingsView(): ReactElement {
   const settingsReturnRoute = useChatStore((s) => s.settingsReturnRoute)
   const settingsSection = useChatStore((s) => s.settingsSection)
   const openCode = useChatStore((s) => s.openCode)
-  const openWrite = useChatStore((s) => s.openWrite)
-  const openClaw = useChatStore((s) => s.openClaw)
   const openInitialSetup = useChatStore((s) => s.openInitialSetup)
   const openPlugins = useChatStore((s) => s.openPlugins)
   const applyI18n = useChatStore((s) => s.applyI18nFromSettings)
@@ -226,8 +112,6 @@ export function SettingsView(): ReactElement {
   const [form, setForm] = useState<AppSettingsV1 | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [workspacePickerError, setWorkspacePickerError] = useState<string | null>(null)
-  const [writeWorkspacePickerError, setWriteWorkspacePickerError] = useState<string | null>(null)
-  const [clawWorkspacePickerError, setClawWorkspacePickerError] = useState<string | null>(null)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
   const [updateInfo, setUpdateInfo] = useState<DeepseekUpdateInfo | null>(null)
@@ -306,14 +190,6 @@ export function SettingsView(): ReactElement {
       setCategory('general')
       return
     }
-    if (settingsSection === 'write') {
-      setCategory('write')
-      return
-    }
-    if (settingsSection === 'claw') {
-      setCategory('claw')
-      return
-    }
     setCategory('agents')
   }, [settingsSection])
 
@@ -321,13 +197,11 @@ export function SettingsView(): ReactElement {
     if (!form) return
     if (
       settingsSection === 'general' ||
-      settingsSection === 'write' ||
-      settingsSection === 'claw' ||
       category !== 'agents'
     ) {
       return
     }
-    const refs: Record<Exclude<SettingsRouteSection, 'general' | 'write' | 'claw'>, HTMLDivElement | null> = {
+    const refs: Record<Exclude<SettingsRouteSection, 'general'>, HTMLDivElement | null> = {
       agents: agentsSectionRef.current,
       skill: skillSectionRef.current,
       mcp: mcpSectionRef.current
@@ -547,14 +421,6 @@ export function SettingsView(): ReactElement {
     void (async () => {
       await flushPendingSave()
       await reloadUiSettings()
-      if (settingsReturnRoute === 'write') {
-        await openWrite()
-        return
-      }
-      if (settingsReturnRoute === 'claw') {
-        openClaw()
-        return
-      }
       if (settingsReturnRoute === 'plugins') {
         setRoute('plugins')
         return
@@ -669,117 +535,6 @@ export function SettingsView(): ReactElement {
     update({ workspaceRoot: DEFAULT_WORKSPACE_ROOT })
   }
 
-  const pickWriteWorkspace = async (): Promise<void> => {
-    try {
-      setWriteWorkspacePickerError(null)
-      if (typeof window.dsGui?.pickWorkspaceDirectory !== 'function') {
-        throw new Error('workspace:pick-directory unavailable')
-      }
-      const picked = await window.dsGui.pickWorkspaceDirectory(
-        form.write.defaultWorkspaceRoot || DEFAULT_WRITE_WORKSPACE_ROOT
-      )
-      if (!picked.canceled && picked.path) {
-        const workspaces = [
-          picked.path,
-          form.write.activeWorkspaceRoot,
-          ...form.write.workspaces
-        ].filter((value, index, list) => value.trim() && list.indexOf(value) === index)
-        update({
-          write: {
-            defaultWorkspaceRoot: picked.path,
-            activeWorkspaceRoot: picked.path,
-            workspaces
-          }
-        })
-      }
-    } catch (e) {
-      setWriteWorkspacePickerError(formatWorkspacePickerError(e))
-    }
-  }
-
-  const resetWriteWorkspaceToDefault = (): void => {
-    setWriteWorkspacePickerError(null)
-    update({
-      write: {
-        defaultWorkspaceRoot: DEFAULT_WRITE_WORKSPACE_ROOT,
-        activeWorkspaceRoot: DEFAULT_WRITE_WORKSPACE_ROOT,
-        workspaces: [DEFAULT_WRITE_WORKSPACE_ROOT, ...form.write.workspaces]
-      }
-    })
-  }
-
-  const pickClawWorkspace = async (): Promise<void> => {
-    try {
-      setClawWorkspacePickerError(null)
-      if (typeof window.dsGui?.pickWorkspaceDirectory !== 'function') {
-        throw new Error('workspace:pick-directory unavailable')
-      }
-      const picked = await window.dsGui.pickWorkspaceDirectory(
-        form.claw.im.workspaceRoot || form.workspaceRoot || undefined
-      )
-      if (!picked.canceled && picked.path) {
-        update({ claw: { im: { workspaceRoot: picked.path } } })
-      }
-    } catch (e) {
-      setClawWorkspacePickerError(formatWorkspacePickerError(e))
-    }
-  }
-
-  const resetClawWorkspaceToDefault = (): void => {
-    setClawWorkspacePickerError(null)
-    update({ claw: { im: { workspaceRoot: '' } } })
-  }
-
-  const updateClawTask = (taskId: string, patch: Partial<ClawTaskV1>): void => {
-    const now = new Date().toISOString()
-    const shouldRecomputeNextRun =
-      Object.prototype.hasOwnProperty.call(patch, 'enabled') || patch.schedule !== undefined
-    update({
-      claw: {
-        tasks: form.claw.tasks.map((task) =>
-          task.id === taskId
-            ? {
-                ...task,
-                ...patch,
-                ...(shouldRecomputeNextRun ? { nextRunAt: '' } : {}),
-                updatedAt: now
-              }
-            : task
-        )
-      }
-    })
-  }
-
-  const updateClawTaskSchedule = (
-    taskId: string,
-    patch: Partial<ClawTaskV1['schedule']>
-  ): void => {
-    const current = form.claw.tasks.find((task) => task.id === taskId)
-    if (!current) return
-    updateClawTask(taskId, {
-      schedule: {
-        ...current.schedule,
-        ...patch
-      }
-    })
-  }
-
-  const addClawTask = (): void => {
-    update({
-      claw: {
-        tasks: [...form.claw.tasks, newClawTask(form.workspaceRoot)]
-      }
-    })
-  }
-
-  const deleteClawTask = (taskId: string): void => {
-    update({
-      claw: {
-        tasks: form.claw.tasks.filter((task) => task.id !== taskId)
-      }
-    })
-  }
-
   const catCls = (c: SettingsCategory): string =>
     `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[14px] font-medium transition ${
       category === c
@@ -808,17 +563,9 @@ export function SettingsView(): ReactElement {
             <Globe className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
             {t('general')}
           </button>
-          <button type="button" className={catCls('write')} onClick={() => setCategory('write')}>
-            <PencilLine className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
-            {t('write')}
-          </button>
           <button type="button" className={catCls('agents')} onClick={() => setCategory('agents')}>
             <Bot className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
             {t('agents')}
-          </button>
-          <button type="button" className={catCls('claw')} onClick={() => setCategory('claw')}>
-            <RadioTower className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
-            {t('claw')}
           </button>
         </nav>
         <div className="ds-no-drag mt-auto border-t border-ds-border p-3">
@@ -1044,242 +791,6 @@ export function SettingsView(): ReactElement {
             </>
           )}
 
-          {category === 'write' && (
-            <>
-              <SettingsCard title={t('sectionWrite')}>
-                <SettingRow
-                  title={t('writeWorkspaceRoot')}
-                  description={t('writeWorkspaceRootDesc')}
-                  control={
-                    <div className="w-full min-w-[200px] md:max-w-xl">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                        <input
-                          className="w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
-                          value={form.write.defaultWorkspaceRoot}
-                          onChange={(e) =>
-                            update({
-                              write: {
-                                defaultWorkspaceRoot: e.target.value,
-                                activeWorkspaceRoot: e.target.value,
-                                workspaces: [e.target.value, ...form.write.workspaces]
-                              }
-                            })
-                          }
-                          placeholder={t('writeWorkspaceRootPlaceholder')}
-                        />
-                        <button
-                          type="button"
-                          onClick={resetWriteWorkspaceToDefault}
-                          className="shrink-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[13px] font-medium text-ds-ink shadow-sm transition hover:bg-ds-hover"
-                        >
-                          {t('restoreWorkspaceDefault')}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void pickWriteWorkspace()}
-                          className="shrink-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[13px] font-medium text-ds-ink shadow-sm transition hover:bg-ds-hover"
-                        >
-                          {t('browse')}
-                        </button>
-                      </div>
-                      {writeWorkspacePickerError ? (
-                        <p className="mt-2 text-[13px] leading-5 text-amber-700 dark:text-amber-300">
-                          {writeWorkspacePickerError}
-                        </p>
-                      ) : null}
-                    </div>
-                  }
-                />
-                <SettingRow
-                  title={t('writeApiKey')}
-                  description={t('writeApiKeyDesc')}
-                  control={
-                    <SecretInput
-                      value={form.deepseek.apiKey}
-                      onChange={(value) => update({ deepseek: { apiKey: value } })}
-                      visible={showApiKey}
-                      onToggleVisibility={() => setShowApiKey((value) => !value)}
-                      placeholder="sk-…"
-                      autoComplete="off"
-                      invalid={!form.deepseek.apiKey.trim()}
-                      showLabel={t('showSecret')}
-                      hideLabel={t('hideSecret')}
-                      className="md:max-w-md"
-                    />
-                  }
-                />
-              </SettingsCard>
-
-              <SettingsCard title={t('writeInlineCompletion')} className="mt-5">
-                <SettingRow
-                  title={t('writeInlineCompletionEnabled')}
-                  description={t('writeInlineCompletionEnabledDesc')}
-                  control={
-                    <Toggle
-                      checked={form.write.inlineCompletion.enabled}
-                      onChange={(enabled) => update({ write: { inlineCompletion: { enabled } } })}
-                    />
-                  }
-                />
-                <SettingRow
-                  title={t('writeInlineCompletionRetrieval')}
-                  description={t('writeInlineCompletionRetrievalDesc')}
-                  control={
-                    <Toggle
-                      checked={form.write.inlineCompletion.retrievalEnabled}
-                      onChange={(retrievalEnabled) => update({ write: { inlineCompletion: { retrievalEnabled } } })}
-                    />
-                  }
-                />
-                <SettingRow
-                  title={t('writeInlineCompletionBaseUrl')}
-                  description={t('writeInlineCompletionBaseUrlDesc')}
-                  control={
-                    <input
-                      className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30 md:max-w-md"
-                      value={form.write.inlineCompletion.baseUrl}
-                      placeholder={DEFAULT_WRITE_INLINE_COMPLETION_BASE_URL}
-                      onChange={(e) => update({ write: { inlineCompletion: { baseUrl: e.target.value } } })}
-                    />
-                  }
-                />
-                <SettingRow
-                  title={t('writeInlineCompletionModel')}
-                  description={t('writeInlineCompletionModelDesc')}
-                  control={
-                    <div className="w-full min-w-0 md:max-w-md">
-                    <input
-                      list="write-inline-completion-model-options"
-                      className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
-                      value={form.write.inlineCompletion.model || DEFAULT_WRITE_INLINE_COMPLETION_MODEL}
-                      placeholder={DEFAULT_WRITE_INLINE_COMPLETION_MODEL}
-                      onChange={(e) => update({ write: { inlineCompletion: { model: e.target.value } } })}
-                    />
-                    <datalist id="write-inline-completion-model-options">
-                      {WRITE_INLINE_COMPLETION_MODEL_IDS.map((model) => (
-                        <option
-                          key={model}
-                          value={model}
-                          label={t(
-                            model === DEFAULT_WRITE_INLINE_COMPLETION_MODEL
-                              ? 'writeInlineCompletionModelFlash'
-                              : 'writeInlineCompletionModelPro'
-                          )}
-                        />
-                      ))}
-                    </datalist>
-                    </div>
-                  }
-                />
-                <SettingRow
-                  title={t('writeInlineCompletionDebounce')}
-                  description={t('writeInlineCompletionDebounceDesc')}
-                  control={
-                    <select
-                      className={selectControlClass}
-                      value={form.write.inlineCompletion.debounceMs}
-                      onChange={(e) => update({
-                        write: { inlineCompletion: { debounceMs: Number(e.target.value) } }
-                      })}
-                    >
-                      <option value={300}>{t('writeInlineCompletionDelayFast')}</option>
-                      <option value={650}>{t('writeInlineCompletionDelayBalanced')}</option>
-                      <option value={1000}>{t('writeInlineCompletionDelayCalm')}</option>
-                      <option value={1500}>{t('writeInlineCompletionDelaySlow')}</option>
-                    </select>
-                  }
-                />
-                <SettingRow
-                  title={t('writeInlineCompletionThreshold')}
-                  description={t('writeInlineCompletionThresholdDesc')}
-                  control={
-                    <select
-                      className={selectControlClass}
-                      value={form.write.inlineCompletion.minAcceptScore}
-                      onChange={(e) => update({
-                        write: { inlineCompletion: { minAcceptScore: Number(e.target.value) } }
-                      })}
-                    >
-                      <option value={0.38}>{t('writeInlineCompletionThresholdCreative')}</option>
-                      <option value={0.52}>{t('writeInlineCompletionThresholdBalanced')}</option>
-                      <option value={0.68}>{t('writeInlineCompletionThresholdStrict')}</option>
-                      <option value={0.82}>{t('writeInlineCompletionThresholdVeryStrict')}</option>
-                    </select>
-                  }
-                />
-                <SettingRow
-                  title={t('writeInlineCompletionMaxTokens')}
-                  description={t('writeInlineCompletionMaxTokensDesc')}
-                  control={
-                    <input
-                      type="number"
-                      min={16}
-                      max={512}
-                      step={8}
-                      className="w-32 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
-                      value={form.write.inlineCompletion.maxTokens}
-                      placeholder={String(DEFAULT_WRITE_INLINE_COMPLETION_MAX_TOKENS)}
-                      onChange={(e) => update({
-                        write: { inlineCompletion: { maxTokens: Number(e.target.value) } }
-                      })}
-                    />
-                  }
-                />
-                <SettingRow
-                  title={t('writeInlineLongCompletion')}
-                  description={t('writeInlineLongCompletionDesc')}
-                  control={
-                    <Toggle
-                      checked={form.write.inlineCompletion.longCompletionEnabled}
-                      onChange={(longCompletionEnabled) => update({
-                        write: { inlineCompletion: { longCompletionEnabled } }
-                      })}
-                    />
-                  }
-                />
-                <SettingRow
-                  title={t('writeInlineLongCompletionDebounce')}
-                  description={t('writeInlineLongCompletionDebounceDesc')}
-                  control={
-                    <select
-                      className={selectControlClass}
-                      value={form.write.inlineCompletion.longDebounceMs}
-                      onChange={(e) => update({
-                        write: { inlineCompletion: { longDebounceMs: Number(e.target.value) } }
-                      })}
-                    >
-                      <option value={1800}>{t('writeInlineLongCompletionDelaySoon')}</option>
-                      <option value={DEFAULT_WRITE_INLINE_LONG_COMPLETION_DEBOUNCE_MS}>{t('writeInlineLongCompletionDelayBalanced')}</option>
-                      <option value={4200}>{t('writeInlineLongCompletionDelayPatient')}</option>
-                      <option value={6500}>{t('writeInlineLongCompletionDelayDeep')}</option>
-                    </select>
-                  }
-                />
-                <SettingRow
-                  title={t('writeInlineLongCompletionMaxTokens')}
-                  description={t('writeInlineLongCompletionMaxTokensDesc')}
-                  control={
-                    <input
-                      type="number"
-                      min={64}
-                      max={1024}
-                      step={16}
-                      className="w-32 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
-                      value={form.write.inlineCompletion.longMaxTokens}
-                      placeholder={String(DEFAULT_WRITE_INLINE_LONG_COMPLETION_MAX_TOKENS)}
-                      onChange={(e) => update({
-                        write: { inlineCompletion: { longMaxTokens: Number(e.target.value) } }
-                      })}
-                    />
-                  }
-                />
-                <div className="px-3 py-3 text-[12.5px] leading-5 text-ds-muted">
-                  {t('writeInlineCompletionApiNote')}
-                </div>
-              </SettingsCard>
-            </>
-          )}
-
           {category === 'agents' && (
             <>
               <div className="mb-6 flex flex-wrap gap-2">
@@ -1475,28 +986,6 @@ export function SettingsView(): ReactElement {
                     }
                   />
                   <SettingRow
-                    title={t('skillsScanDirs')}
-                    description={t('skillsScanDirsDesc')}
-                    wideControl
-                    control={
-                      <textarea
-                        value={listSettingsText(form.claw.skills.extraDirs)}
-                        onChange={(event) =>
-                          update({
-                            claw: {
-                              skills: {
-                                extraDirs: splitSettingsList(event.target.value)
-                              }
-                            }
-                          })
-                        }
-                        spellCheck={false}
-                        placeholder={selectedSkillRoot?.path || '~/.agents/skills'}
-                        className="min-h-24 w-full rounded-2xl border border-ds-border bg-ds-card px-4 py-3 font-mono text-[13px] leading-6 text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
-                      />
-                    }
-                  />
-                  <SettingRow
                     title={t('skillsActions')}
                     description={t('skillsActionsDesc')}
                     wideControl
@@ -1651,223 +1140,6 @@ export function SettingsView(): ReactElement {
                   />
                 </SettingsCard>
               </div>
-            </>
-          )}
-
-          {category === 'claw' && (
-            <>
-              <SettingsCard title={t('clawRuntime')}>
-                <SettingRow
-                  title={t('clawEnabled')}
-                  description={t('clawEnabledDesc')}
-                  control={
-                    <Toggle
-                      checked={form.claw.enabled}
-                      onChange={(value) => update({ claw: { enabled: value } })}
-                    />
-                  }
-                />
-                <SettingRow
-                  title={t('clawDefaultWorkspace')}
-                  description={t('clawDefaultWorkspaceDesc')}
-                  control={
-                    <div className="w-full min-w-[200px] md:max-w-xl">
-                      <div className="flex items-center gap-2">
-                        <input
-                          className="w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
-                          value={form.claw.im.workspaceRoot}
-                          onChange={(e) =>
-                            update({
-                              claw: {
-                                im: {
-                                  workspaceRoot: e.target.value
-                                }
-                              }
-                            })
-                          }
-                          placeholder={t('clawDefaultWorkspacePlaceholder', { path: form.workspaceRoot })}
-                        />
-                        <button
-                          type="button"
-                          onClick={resetClawWorkspaceToDefault}
-                          className="shrink-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[13px] font-medium text-ds-ink shadow-sm transition hover:bg-ds-hover"
-                        >
-                          {t('clawDefaultWorkspaceReset')}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void pickClawWorkspace()}
-                          className="shrink-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[13px] font-medium text-ds-ink shadow-sm transition hover:bg-ds-hover"
-                        >
-                          {t('browse')}
-                        </button>
-                      </div>
-                      {clawWorkspacePickerError ? (
-                        <p className="mt-2 text-[13px] leading-5 text-amber-700 dark:text-amber-300">
-                          {clawWorkspacePickerError}
-                        </p>
-                      ) : null}
-                    </div>
-                  }
-                />
-              </SettingsCard>
-
-              <SettingsCard title={t('clawTasksTitle')} className="mt-6">
-                <SettingRow
-                  title={t('clawTasksTitle')}
-                  description={t('clawTasksDesc')}
-                  wideControl
-                  control={
-                    <div className="flex w-full flex-col gap-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="text-[13px] leading-5 text-ds-muted">
-                          {form.claw.tasks.length === 0 ? t('clawTasksEmpty') : t('clawTasksCount', { count: form.claw.tasks.length })}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={addClawTask}
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-ds-userbubble px-3 py-2 text-[13px] font-medium text-ds-userbubbleFg shadow-sm transition hover:opacity-90"
-                        >
-                          <Plus className="h-3.5 w-3.5" strokeWidth={2} />
-                          {t('clawTaskAdd')}
-                        </button>
-                      </div>
-                      {form.claw.tasks.map((task) => (
-                        <div
-                          key={task.id}
-                          className="rounded-xl border border-ds-border-muted bg-ds-main/45 p-4"
-                        >
-                          <div className="flex flex-wrap items-center gap-3">
-                            <input
-                              className="min-w-[220px] flex-1 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] font-medium text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
-                              value={task.title}
-                              onChange={(event) => updateClawTask(task.id, { title: event.target.value })}
-                            />
-                            <Toggle
-                              checked={task.enabled}
-                              onChange={(value) => updateClawTask(task.id, { enabled: value })}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => deleteClawTask(task.id)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-ds-border bg-ds-card text-ds-muted transition hover:bg-ds-hover hover:text-red-600"
-                              title={t('clawTaskDelete')}
-                              aria-label={t('clawTaskDelete')}
-                            >
-                              <Trash2 className="h-4 w-4" strokeWidth={1.8} />
-                            </button>
-                          </div>
-                          <div className="mt-3 grid gap-3 md:grid-cols-2">
-                            <select
-                              className={selectControlClass}
-                              value={task.schedule.kind}
-                              onChange={(event) =>
-                                updateClawTaskSchedule(task.id, {
-                                  kind: event.target.value as ClawScheduleKind
-                                })
-                              }
-                              title={t('clawScheduleKind')}
-                            >
-                              <option value="manual">{t('clawScheduleManual')}</option>
-                              <option value="interval">{t('clawScheduleInterval')}</option>
-                              <option value="daily">{t('clawScheduleDailyShort')}</option>
-                              <option value="at">{t('clawScheduleAtShort')}</option>
-                            </select>
-                            {task.schedule.kind === 'daily' ? (
-                              <input
-                                type="time"
-                                className={selectControlClass}
-                                value={task.schedule.timeOfDay}
-                                onChange={(event) =>
-                                  updateClawTaskSchedule(task.id, { timeOfDay: event.target.value })
-                                }
-                                title={t('clawTimeOfDay')}
-                              />
-                            ) : task.schedule.kind === 'at' ? (
-                              <input
-                                type="datetime-local"
-                                className={selectControlClass}
-                                value={dateTimeLocalValueFromIso(task.schedule.atTime)}
-                                onChange={(event) =>
-                                  updateClawTaskSchedule(task.id, {
-                                    atTime: isoFromDateTimeLocalValue(event.target.value)
-                                  })
-                                }
-                                title={t('clawAtTime')}
-                              />
-                            ) : (
-                              <input
-                                type="number"
-                                min={1}
-                                max={10080}
-                                className={selectControlClass}
-                                value={task.schedule.everyMinutes}
-                                onChange={(event) =>
-                                  updateClawTaskSchedule(task.id, {
-                                    everyMinutes: Number(event.target.value)
-                                  })
-                                }
-                                title={t('clawEveryMinutes')}
-                              />
-                            )}
-                            <select
-                              className={selectControlClass}
-                              value={task.mode}
-                              onChange={(event) =>
-                                updateClawTask(task.id, { mode: event.target.value as ClawRunMode })
-                              }
-                              title={t('clawRunMode')}
-                            >
-                              {CLAW_MODE_OPTIONS.map((option) => (
-                                <option key={option.id} value={option.id}>
-                                  {t(option.key)}
-                                </option>
-                              ))}
-                            </select>
-                            <select
-                              className={selectControlClass}
-                              value={task.model}
-                              onChange={(event) => updateClawTask(task.id, { model: event.target.value })}
-                              title={t('clawModel')}
-                            >
-                              {CLAW_MODEL_IDS.map((model) => (
-                                <option key={model} value={model}>
-                                  {model}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <input
-                            className="mt-3 w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
-                            value={task.workspaceRoot}
-                            onChange={(event) => updateClawTask(task.id, { workspaceRoot: event.target.value })}
-                            placeholder={t('clawWorkspaceInherit', { path: form.workspaceRoot })}
-                          />
-                          <textarea
-                            className="mt-3 min-h-28 w-full rounded-2xl border border-ds-border bg-ds-card px-4 py-3 text-[14px] leading-6 text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
-                            value={task.prompt}
-                            onChange={(event) => updateClawTask(task.id, { prompt: event.target.value })}
-                            placeholder={t('clawTaskPromptPlaceholder')}
-                          />
-                          <div className="mt-3 flex flex-wrap gap-2 text-[12px] text-ds-faint">
-                            <span className="rounded-full bg-ds-subtle px-2.5 py-1">
-                              {clawScheduleSummary(task, t)}
-                            </span>
-                            <span className="rounded-full bg-ds-subtle px-2.5 py-1">
-                              {t('clawLastStatus')}: {task.lastStatus}
-                            </span>
-                            {task.lastThreadId ? (
-                              <span className="max-w-full truncate rounded-full bg-ds-subtle px-2.5 py-1">
-                                {t('clawLastThread')}: {task.lastThreadId}
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  }
-                />
-              </SettingsCard>
             </>
           )}
         </div>

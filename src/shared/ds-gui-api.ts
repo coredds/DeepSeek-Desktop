@@ -1,15 +1,11 @@
 import type {
   AppSettingsPatch,
-  AppSettingsV1,
-  ClawRunResult,
-  ClawTaskFromTextResult,
-  ClawRuntimeStatus
+  AppSettingsV1
 } from './app-settings'
 import type { DeepseekUpdateInfo, DeepseekUpdateInstallResult } from './deepseek-update'
 import type { EditorListResult, EditorOpenResult, OpenEditorPathOptions } from './editor'
 import type { GitBranchesResult } from './git-branches'
 import type { WorkspaceHealthResult } from './workspace-health'
-import type { WriteTemplate } from './write-template'
 import type {
   TerminalCreateOptions,
   TerminalCreateResult,
@@ -42,16 +38,6 @@ import type {
   WorkspaceFileWritePayload,
   WorkspaceFileWriteResult
 } from './workspace-file'
-import type {
-  WriteInlineCompletionRequest,
-  WriteInlineCompletionResult
-} from './write-inline-completion'
-import type {
-  WriteExportPayload,
-  WriteExportResult,
-  WriteRichClipboardPayload,
-  WriteRichClipboardResult
-} from './write-export'
 
 export type RuntimeRequestResult = { ok: boolean; status: number; body: string }
 export type WorkspacePickResult = { canceled: boolean; path: string | null }
@@ -107,22 +93,9 @@ export type TurnCompleteNotificationPayload = {
 export type SystemNotificationResult =
   | { ok: true; shown: boolean; reason?: string }
   | { ok: false; message: string }
-export type ClawChannelActivityPayload = {
-  channelId: string
-  threadId: string
-}
-export type ClawChannelMirrorResult =
-  | { ok: true }
-  | { ok: false; message: string }
 export type UpstreamModelsResult =
   | { ok: true; modelIds: string[] }
   | { ok: false; message: string }
-export type ClawImInstallQrResult =
-  | { ok: true; url: string; deviceCode: string; interval: number; expireIn: number }
-  | { ok: false; message: string }
-export type ClawImInstallPollResult =
-  | { done: true; kind: 'feishu'; appId: string; appSecret: string; domain: string }
-  | { done: false; error?: string }
 export type ExportMarkdownResult =
   | { ok: true; path: string }
   | { ok: false; message: string }
@@ -148,16 +121,6 @@ export type DsGuiApi = {
     descriptions: Array<{ name: string; text: string }>
     diagnostics: Array<{ name: string; ok: boolean; detail: string }>
   }>
-  getClawStatus: () => Promise<ClawRuntimeStatus>
-  runClawTask: (taskId: string) => Promise<ClawRunResult>
-  startClawImInstallQr: (
-    provider: 'feishu',
-    options?: { isLark?: boolean }
-  ) => Promise<ClawImInstallQrResult>
-  pollClawImInstall: (
-    provider: 'feishu',
-    deviceCode: string
-  ) => Promise<ClawImInstallPollResult>
   deepseekSpawnIfNeeded: () => Promise<DeepseekSpawnResult>
   prepareDeepseekBinary: () => Promise<{ ok: true; path: string } | { ok: false; message: string }>
   checkDeepseekUpdate: () => Promise<DeepseekUpdateInfo>
@@ -171,7 +134,6 @@ export type DsGuiApi = {
   diagnoseDeepseekRuntime: () => Promise<DeepseekRuntimeDiagnosticsResult>
   getGitBranches: (workspaceRoot: string) => Promise<GitBranchesResult>
   getWorkspaceHealth: (workspaceRoot: string) => Promise<WorkspaceHealthResult>
-  listTemplates: () => Promise<WriteTemplate[]>
   switchGitBranch: (workspaceRoot: string, branch: string) => Promise<GitBranchesResult>
   createAndSwitchGitBranch: (workspaceRoot: string, branch: string) => Promise<GitBranchesResult>
   listEditors: () => Promise<EditorListResult>
@@ -203,28 +165,11 @@ export type DsGuiApi = {
   watchWorkspaceFile: (payload: WorkspaceFileWatchPayload) => Promise<WorkspaceFileWatchResult>
   unwatchWorkspaceFile: (watchId: string) => Promise<boolean>
   onWorkspaceFileChanged: (handler: (payload: WorkspaceFileChangePayload) => void) => () => void
-  requestWriteInlineCompletion: (
-    payload: WriteInlineCompletionRequest
-  ) => Promise<WriteInlineCompletionResult>
-  exportWriteDocument: (payload: WriteExportPayload) => Promise<WriteExportResult>
-  copyWriteDocumentAsRichText: (
-    payload: WriteRichClipboardPayload
-  ) => Promise<WriteRichClipboardResult>
   startSse: (threadId: string, sinceSeq: number, streamId?: string) => Promise<{ streamId: string }>
   stopSse: (streamId: string) => Promise<boolean>
   onSseEvent: (handler: (payload: SseEventPayload) => void) => () => void
   onSseEnd: (handler: (payload: SseEndPayload) => void) => () => void
   onSseError: (handler: (payload: SseErrorPayload) => void) => () => void
-  onClawChannelActivity: (handler: (payload: ClawChannelActivityPayload) => void) => () => void
-  mirrorClawChannelMessageToFeishu: (
-    threadId: string,
-    text: string,
-    direction: 'user' | 'assistant'
-  ) => Promise<ClawChannelMirrorResult>
-  createClawTaskFromText: (
-    text: string,
-    options?: { channelId?: string; modelHint?: string; mode?: 'agent' | 'plan' }
-  ) => Promise<ClawTaskFromTextResult>
   focusWindow: () => Promise<void>
   openExternal: (url: string) => Promise<void>
   showTurnCompleteNotification: (

@@ -42,15 +42,4 @@ export function upstreamOpenAiChatCompletionsUrl(baseUrl: string): string {
   return `${versioned.replace(/\/+$/, '')}/${path}`
 }
 
-export function upstreamDeepSeekFimCompletionsUrl(baseUrl: string): string {
-  const path = 'completions'
-  const trimmed = baseUrl.trim().replace(/\/+$/, '')
-  const base = trimmed || 'https://api.deepseek.com/beta'
-  const segment = base.split('/').pop()?.toLowerCase() ?? ''
-  const betaBase = segment === 'beta'
-    ? base
-    : isVersionSegment(segment)
-      ? `${unversionedBaseUrl(base)}/beta`
-      : `${base}/beta`
-  return `${betaBase.replace(/\/+$/, '')}/${path}`
-}
+

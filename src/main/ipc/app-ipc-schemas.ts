@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { WRITE_EXPORT_FORMATS } from '../../shared/write-export'
 
 const MAX_BODY_BYTES = 2_000_000
 const MAX_RUNTIME_BODY_BYTES = 10_000_000
@@ -11,11 +10,8 @@ const MAX_BRANCH_LENGTH = 255
 const MAX_EDITOR_ID_LENGTH = 64
 const MAX_NOTIFICATION_TITLE_LENGTH = 200
 const MAX_NOTIFICATION_BODY_LENGTH = 5_000
-const MAX_CHANNEL_TEXT_LENGTH = 100_000
 const MAX_SKILL_FILE_BYTES = 1_000_000
 const MAX_CONFIG_FILE_BYTES = 2_000_000
-const MAX_DEVICE_CODE_LENGTH = 8_192
-const MAX_EDITOR_COMPLETION_TEXT = 200_000
 
 const SAFE_OPEN_EXTERNAL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
 
@@ -174,78 +170,6 @@ export const workspaceFileWatchPayloadSchema = z
   })
   .strict()
 
-export const writeExportPayloadSchema = z
-  .object({
-    path: trimmedString(MAX_PATH_LENGTH),
-    workspaceRoot: optionalTrimmedString(MAX_PATH_LENGTH),
-    format: z.enum(WRITE_EXPORT_FORMATS),
-    content: z.string().max(MAX_BODY_BYTES)
-  })
-  .strict()
-
-export const writeRichClipboardPayloadSchema = z
-  .object({
-    path: trimmedString(MAX_PATH_LENGTH),
-    workspaceRoot: optionalTrimmedString(MAX_PATH_LENGTH),
-    content: z.string().max(MAX_BODY_BYTES)
-  })
-  .strict()
-
-export const writeInlineCompletionPayloadSchema = z
-  .object({
-    prefix: z.string().max(MAX_EDITOR_COMPLETION_TEXT),
-    suffix: z.string().max(MAX_EDITOR_COMPLETION_TEXT),
-    mode: z.enum(['short', 'long']).optional(),
-    workspaceRoot: optionalTrimmedString(MAX_PATH_LENGTH),
-    currentFilePath: optionalTrimmedString(MAX_PATH_LENGTH),
-    cursor: z
-      .object({
-        line: z.number().int().positive().max(1_000_000),
-        column: z.number().int().min(0).max(1_000_000)
-      })
-      .strict(),
-    context: z
-      .object({
-        language: trimmedString(64),
-        currentLinePrefix: z.string().max(20_000),
-        currentLineSuffix: z.string().max(20_000),
-        previousLine: z.string().max(20_000),
-        previousNonEmptyLine: z.string().max(20_000),
-        nextLine: z.string().max(20_000),
-        indentation: z.string().max(2_000),
-        signals: z
-          .object({
-            list: z.boolean(),
-            quote: z.boolean(),
-            heading: z.boolean(),
-            table: z.boolean(),
-            atLineEnd: z.boolean(),
-            endsWithSentencePunctuation: z.boolean(),
-            previousLineEndsWithSentencePunctuation: z.boolean(),
-            prefersNewLineCompletion: z.boolean(),
-            paragraphBreakOpportunity: z.boolean()
-          })
-          .strict()
-      })
-      .strict(),
-    policy: z
-      .object({
-        name: trimmedString(128),
-        instruction: z.string().max(50_000),
-        acceptanceCriteria: z.array(z.string().max(5_000)).max(12),
-        rejectionCriteria: z.array(z.string().max(5_000)).max(12)
-      })
-      .strict(),
-    preview: z
-      .object({
-        local: z.string().max(5_000),
-        documentTail: z.string().max(20_000)
-      })
-      .strict(),
-    model: optionalTrimmedString(128)
-  })
-  .strict()
-
 export const shellOpenExternalUrlSchema = trimmedString(MAX_URL_LENGTH).refine(
   isSafeOpenExternalUrl,
   { message: 'Only http, https, and mailto URLs are allowed.' }
@@ -264,30 +188,6 @@ export const logErrorPayloadSchema = z
     category: trimmedString(128),
     message: trimmedString(2_000),
     detail: z.unknown().optional()
-  })
-  .strict()
-
-export const clawMirrorPayloadSchema = z
-  .object({
-    threadId: trimmedString(MAX_ID_LENGTH),
-    text: z.string().trim().min(1).max(MAX_CHANNEL_TEXT_LENGTH),
-    direction: z.enum(['user', 'assistant'])
-  })
-  .strict()
-
-export const clawTaskFromTextPayloadSchema = z
-  .object({
-    text: z.string().trim().min(1).max(MAX_CHANNEL_TEXT_LENGTH),
-    channelId: z.string().trim().min(1).max(MAX_ID_LENGTH).nullable().optional(),
-    modelHint: z.string().trim().min(1).max(128).nullable().optional(),
-    mode: z.enum(['agent', 'plan']).nullable().optional()
-  })
-  .strict()
-
-export const clawImInstallPollPayloadSchema = z
-  .object({
-    provider: z.literal('feishu'),
-    deviceCode: trimmedString(MAX_DEVICE_CODE_LENGTH)
   })
   .strict()
 

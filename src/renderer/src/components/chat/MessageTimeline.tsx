@@ -5,7 +5,6 @@ import remarkGfm from 'remark-gfm'
 import { useTranslation } from 'react-i18next'
 import {
   Bot,
-  Bug,
   Check,
   ChevronDown,
   ChevronRight,
@@ -13,17 +12,13 @@ import {
   FileEdit,
   FolderOpen,
   GitFork,
-  Lightbulb,
   Loader2,
-  MessageSquareQuote,
   Minimize2,
-  Palette,
   Paperclip,
   PencilLine,
   Terminal,
   Wrench
 } from 'lucide-react'
-import type { ClawImChannelV1 } from '@shared/app-settings'
 import type {
   ChatBlock,
   RuntimeConnectionStatus,
@@ -40,11 +35,6 @@ import {
 } from '../../lib/diff-stats'
 import { useDeferredRender } from '../../hooks/use-deferred-render'
 import { useChatStore } from '../../store/chat-store'
-import {
-  parseWritePromptForDisplay,
-  type WritePromptDisplay,
-  type WritePromptDisplayQuote
-} from '../../write/quoted-selection'
 import { DiffView } from '../DiffView'
 
 const LazyStreamdownAssistant = lazy(() =>
@@ -60,7 +50,6 @@ type Props = {
   onRetryConnection: () => void
   onOpenSettings: () => void
   onOpenDiagnostics: () => void
-  onSelectSuggestion?: (prompt: string) => void
   devPreviewCard?: ReactElement | null
 }
 
@@ -155,15 +144,11 @@ export function MessageTimeline({
   onRetryConnection,
   onOpenSettings,
   onOpenDiagnostics,
-  onSelectSuggestion,
   devPreviewCard
 }: Props): ReactElement {
   const { t } = useTranslation('common')
-  const route = useChatStore((s) => s.route)
   const workspaceRoot = useChatStore((s) => s.workspaceRoot)
   const chooseWorkspace = useChatStore((s) => s.chooseWorkspace)
-  const clawChannels = useChatStore((s) => s.clawChannels)
-  const activeClawChannelId = useChatStore((s) => s.activeClawChannelId)
   const busy = useChatStore((s) => s.busy)
   const currentTurnUserId = useChatStore((s) => s.currentTurnUserId)
   const turnStartedAtByUserId = useChatStore((s) => s.turnStartedAtByUserId)
@@ -173,11 +158,6 @@ export function MessageTimeline({
   const activeThread = useChatStore((s) =>
     activeThreadId ? s.threads.find((thread) => thread.id === activeThreadId) ?? null : null
   )
-  const activeClawChannel = useMemo(
-    () => clawChannels.find((channel) => channel.id === activeClawChannelId) ?? null,
-    [activeClawChannelId, clawChannels]
-  )
-  const heroRoute: 'chat' | 'claw' | 'chat-pure' = route === 'claw' ? 'claw' : route === 'chat-pure' ? 'chat-pure' : 'chat'
   const hasContent = blocks.length > 0 || live || liveReasoning
   const endRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -311,47 +291,25 @@ export function MessageTimeline({
   return (
     <div ref={containerRef} className="ds-no-drag flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
       <div className="ds-chat-column-inset mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-8 pb-10 pt-8">
-        {!activeThreadId && heroRoute === 'chat-pure' ? (
-          <ChatEmptyHero
-            ready={runtimeConnection === 'ready'}
-            onSelectSuggestion={onSelectSuggestion}
-            onRetry={onRetryConnection}
-            onOpenSettings={onOpenSettings}
-            onOpenDiagnostics={onOpenDiagnostics}
-          />
-        ) : !activeThreadId ? (
+        {!activeThreadId ? (
           <EmptyHero
-            route={heroRoute}
             ready={runtimeConnection === 'ready'}
             hasWorkspace={!!workspaceRoot}
-            activeClawChannel={activeClawChannel}
             onPickWorkspace={() => void chooseWorkspace()}
             onRetry={onRetryConnection}
             onOpenSettings={onOpenSettings}
             onOpenDiagnostics={onOpenDiagnostics}
-            onSelectSuggestion={onSelectSuggestion}
           />
         ) : null}
 
-        {activeThreadId && !hasContent && heroRoute === 'chat-pure' ? (
-          <ChatEmptyHero
-            ready={runtimeConnection === 'ready'}
-            onSelectSuggestion={onSelectSuggestion}
-            onRetry={onRetryConnection}
-            onOpenSettings={onOpenSettings}
-            onOpenDiagnostics={onOpenDiagnostics}
-          />
-        ) : activeThreadId && !hasContent ? (
+        {activeThreadId && !hasContent ? (
           <EmptyHero
-            route={heroRoute}
             ready={runtimeConnection === 'ready'}
             hasWorkspace={!!workspaceRoot}
-            activeClawChannel={activeClawChannel}
             onPickWorkspace={() => void chooseWorkspace()}
             onRetry={onRetryConnection}
             onOpenSettings={onOpenSettings}
             onOpenDiagnostics={onOpenDiagnostics}
-            onSelectSuggestion={onSelectSuggestion}
           />
         ) : null}
 
@@ -459,35 +417,20 @@ export function MessageTimeline({
   )
 }
 
-type SuggestionTone = 'blue' | 'emerald' | 'violet' | 'orange'
-
-const SUGGESTION_TONE: Record<SuggestionTone, string> = {
-  blue: 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300',
-  emerald: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300',
-  violet: 'bg-violet-50 text-violet-600 dark:bg-ds-skill-soft dark:text-ds-skill',
-  orange: 'bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300'
-}
-
 function EmptyHero({
-  route,
   ready,
   hasWorkspace,
-  activeClawChannel,
   onPickWorkspace,
   onRetry,
   onOpenSettings,
-  onOpenDiagnostics,
-  onSelectSuggestion
+  onOpenDiagnostics
 }: {
-  route: 'chat' | 'claw' | 'chat-pure'
   ready: boolean
   hasWorkspace: boolean
-  activeClawChannel: ClawImChannelV1 | null
   onPickWorkspace: () => void
   onRetry: () => void
   onOpenSettings: () => void
   onOpenDiagnostics: () => void
-  onSelectSuggestion?: (prompt: string) => void
 }): ReactElement {
   const { t } = useTranslation('common')
 
@@ -530,7 +473,7 @@ function EmptyHero({
     )
   }
 
-  if (route !== 'chat-pure' && !hasWorkspace) {
+  if (!hasWorkspace) {
     return (
       <div className="ds-no-drag flex flex-col items-center justify-center px-6 py-24 text-center">
         <FolderOpen className="mb-4 h-8 w-8 text-ds-muted" strokeWidth={1.6} />
@@ -551,281 +494,17 @@ function EmptyHero({
     )
   }
 
-  if (route === 'claw') {
-    return (
-      <ClawEmptyHero
-        channel={activeClawChannel}
-        onSelectSuggestion={onSelectSuggestion}
-      />
-    )
-  }
-
-  const suggestions: Array<{
-    icon: ReactElement
-    tone: SuggestionTone
-    titleKey: string
-    subKey: string
-    promptKey: string
-  }> = [
-    {
-      icon: <FolderOpen className="h-4 w-4" strokeWidth={1.8} />,
-      tone: 'blue',
-      titleKey: 'promptStructureTitle',
-      subKey: 'promptStructureSub',
-      promptKey: 'promptStructurePrompt'
-    },
-    {
-      icon: <Bug className="h-4 w-4" strokeWidth={1.8} />,
-      tone: 'emerald',
-      titleKey: 'promptBugTitle',
-      subKey: 'promptBugSub',
-      promptKey: 'promptBugPrompt'
-    },
-    {
-      icon: <Lightbulb className="h-4 w-4" strokeWidth={1.8} />,
-      tone: 'violet',
-      titleKey: 'promptPlanTitle',
-      subKey: 'promptPlanSub',
-      promptKey: 'promptPlanPrompt'
-    },
-    {
-      icon: <Palette className="h-4 w-4" strokeWidth={1.8} />,
-      tone: 'orange',
-      titleKey: 'promptDesignTitle',
-      subKey: 'promptDesignSub',
-      promptKey: 'promptDesignPrompt'
-    }
-  ]
-
   return (
-    <div className="ds-empty-hero ds-no-drag flex flex-col items-center justify-center px-4 pb-4 pt-20 text-center">
-      <h1 className="ds-empty-hero-title text-[40px] font-semibold tracking-[-0.045em] text-ds-ink">
+    <div className="ds-empty-hero ds-no-drag flex flex-col items-center justify-center px-4 pb-4 pt-28 text-center">
+      <div className="ds-card-soft mb-6 rounded-[20px] px-5 py-4">
+        <Bot className="mx-auto h-7 w-7 text-accent opacity-90" strokeWidth={1.4} />
+      </div>
+      <h1 className="ds-empty-hero-title text-[28px] font-semibold tracking-[-0.035em] text-ds-ink">
         {t('emptyHeroTitle')}
       </h1>
-      <p className="ds-empty-hero-sub mt-5 text-[17px] leading-8 text-ds-muted">
+      <p className="ds-empty-hero-sub mt-3 text-[16px] leading-7 text-ds-muted">
         {t('emptyHeroSub')}
       </p>
-
-      <div className="ds-empty-hero-grid mt-12 grid w-full max-w-[980px] gap-5">
-        {suggestions.map((s) => (
-          <button
-            key={s.titleKey}
-            type="button"
-            onClick={() => onSelectSuggestion?.(t(s.promptKey))}
-            className="ds-empty-hero-card group flex min-h-[118px] items-center gap-4 rounded-[24px] border border-[rgba(15,23,42,0.1)] bg-[rgba(255,255,255,0.92)] px-6 py-5 text-left shadow-[0_18px_48px_rgba(86,103,136,0.08)] transition duration-200 hover:-translate-y-0.5 hover:border-[rgba(0,136,255,0.18)] hover:shadow-[0_24px_56px_rgba(86,103,136,0.14)] dark:border-white/10 dark:bg-[rgba(24,24,24,0.9)] dark:shadow-[0_20px_52px_rgba(0,0,0,0.24)]"
-          >
-            <span
-              className={`ds-empty-hero-card-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] ${SUGGESTION_TONE[s.tone]}`}
-            >
-              {s.icon}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="ds-empty-hero-card-title block truncate text-[18px] font-semibold tracking-[-0.02em] text-ds-ink">
-                {t(s.titleKey)}
-              </span>
-              <span className="ds-empty-hero-card-sub mt-1 block text-[15px] leading-6 text-ds-faint">
-                {t(s.subKey)}
-              </span>
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function ChatEmptyHero({
-  ready,
-  onSelectSuggestion,
-  onRetry,
-  onOpenSettings,
-  onOpenDiagnostics
-}: {
-  ready: boolean
-  onSelectSuggestion?: (prompt: string) => void
-  onRetry: () => void
-  onOpenSettings: () => void
-  onOpenDiagnostics: () => void
-}): ReactElement {
-  const { t } = useTranslation('common')
-
-  if (!ready) {
-    return (
-      <div className="flex flex-col items-center justify-center px-8 py-20 text-center">
-        <div className="ds-card-soft mb-5 rounded-[20px] px-5 py-4">
-          <Bot className="mx-auto h-7 w-7 text-accent opacity-90" strokeWidth={1.4} />
-        </div>
-        <p className="max-w-sm text-[24px] font-semibold tracking-[-0.03em] text-ds-ink">
-          {t('runtimeOfflineHeroTitle')}
-        </p>
-        <p className="mt-3 max-w-[560px] text-[15.5px] leading-7 text-ds-muted">
-          {t('runtimeOfflineHeroSub')}
-        </p>
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-          <button
-            type="button"
-            className="ds-chip rounded-full px-5 py-2.5 text-[13px] font-medium text-ds-ink transition hover:text-ds-ink"
-            onClick={onRetry}
-          >
-            {t('retryConnection')}
-          </button>
-          <button
-            type="button"
-            className="ds-chip-muted rounded-full px-5 py-2.5 text-[13px] font-medium text-ds-muted transition hover:text-ds-ink"
-            onClick={onOpenDiagnostics}
-          >
-            {t('runtimeDiagnosticsButton')}
-          </button>
-          <button
-            type="button"
-            className="ds-chip-muted rounded-full px-5 py-2.5 text-[13px] font-medium text-ds-muted transition hover:text-ds-ink"
-            onClick={onOpenSettings}
-          >
-            {t('openSettings')}
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  const suggestions: Array<{
-    icon: ReactElement
-    tone: SuggestionTone
-    titleKey: string
-    subKey: string
-    promptKey: string
-  }> = [
-    {
-      icon: <Lightbulb className="h-4 w-4" strokeWidth={1.8} />,
-      tone: 'violet',
-      titleKey: 'chatPromptExplainTitle',
-      subKey: 'chatPromptExplainSub',
-      promptKey: 'chatPromptExplainPrompt'
-    },
-    {
-      icon: <PencilLine className="h-4 w-4" strokeWidth={1.8} />,
-      tone: 'blue',
-      titleKey: 'chatPromptWriteTitle',
-      subKey: 'chatPromptWriteSub',
-      promptKey: 'chatPromptWritePrompt'
-    },
-    {
-      icon: <Terminal className="h-4 w-4" strokeWidth={1.8} />,
-      tone: 'emerald',
-      titleKey: 'chatPromptCodeTitle',
-      subKey: 'chatPromptCodeSub',
-      promptKey: 'chatPromptCodePrompt'
-    },
-    {
-      icon: <Palette className="h-4 w-4" strokeWidth={1.8} />,
-      tone: 'orange',
-      titleKey: 'chatPromptBrainstormTitle',
-      subKey: 'chatPromptBrainstormSub',
-      promptKey: 'chatPromptBrainstormPrompt'
-    }
-  ]
-
-  return (
-    <div className="ds-empty-hero ds-no-drag flex flex-col items-center justify-center px-4 pb-4 pt-16 text-center">
-      <h1 className="ds-empty-hero-title text-[44px] font-semibold tracking-[-0.05em] text-ds-ink">
-        {t('chatEmptyHeroTitle')}
-      </h1>
-      <p className="ds-empty-hero-sub mt-4 text-[18px] leading-8 text-ds-muted">
-        {t('chatEmptyHeroSub')}
-      </p>
-
-      <div className="ds-empty-hero-grid mt-14 grid w-full max-w-[980px] gap-5">
-        {suggestions.map((s) => (
-          <button
-            key={s.titleKey}
-            type="button"
-            onClick={() => onSelectSuggestion?.(t(s.promptKey))}
-            className="ds-empty-hero-card group flex min-h-[118px] items-center gap-4 rounded-[24px] border border-[rgba(15,23,42,0.1)] bg-[rgba(255,255,255,0.92)] px-6 py-5 text-left shadow-[0_18px_48px_rgba(86,103,136,0.08)] transition duration-200 hover:-translate-y-0.5 hover:border-[rgba(0,136,255,0.18)] hover:shadow-[0_24px_56px_rgba(86,103,136,0.14)] dark:border-white/10 dark:bg-[rgba(24,24,24,0.9)] dark:shadow-[0_20px_52px_rgba(0,0,0,0.24)]"
-          >
-            <span
-              className={`ds-empty-hero-card-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] ${SUGGESTION_TONE[s.tone]}`}
-            >
-              {s.icon}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="ds-empty-hero-card-title block truncate text-[18px] font-semibold tracking-[-0.02em] text-ds-ink">
-                {t(s.titleKey)}
-              </span>
-              <span className="ds-empty-hero-card-sub mt-1 block text-[15px] leading-6 text-ds-faint">
-                {t(s.subKey)}
-              </span>
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-type ClawPromptSuggestion = {
-  icon: ReactElement
-  tone: SuggestionTone
-  titleKey: string
-  subKey: string
-  promptKey: string
-}
-
-function clawChannelDisplayName(
-  channel: ClawImChannelV1 | null,
-  fallback: string
-): string {
-  if (!channel) return fallback
-  return (
-    channel.agentProfile.name.trim()
-    || channel.label.trim()
-    || channel.agentProfile.description.trim()
-    || fallback
-  )
-}
-
-function clawChannelSummary(
-  channel: ClawImChannelV1 | null,
-  fallback: string
-): string {
-  if (!channel) return fallback
-  return (
-    channel.agentProfile.description.trim()
-    || channel.agentProfile.identity.trim()
-    || channel.agentProfile.personality.trim()
-    || fallback
-  )
-}
-
-function ClawEmptyHero({
-  channel,
-  onSelectSuggestion
-}: {
-  channel: ClawImChannelV1 | null
-  onSelectSuggestion?: (prompt: string) => void
-}): ReactElement {
-  const { t } = useTranslation('common')
-  const agentName = clawChannelDisplayName(channel, t('clawEmptyHeroFallbackName'))
-  void onSelectSuggestion
-  const hasInboundConversation = Boolean(
-    channel?.conversations.length || channel?.remoteSession?.chatId?.trim()
-  )
-
-  return (
-    <div className="ds-no-drag flex justify-center px-4 pb-6 pt-12 md:px-8 md:pt-16">
-      <div className="w-full max-w-[980px] rounded-[32px] border border-ds-border-muted bg-ds-card/78 px-8 py-10 text-left shadow-[0_16px_40px_rgba(15,23,42,0.06)] backdrop-blur md:px-12 md:py-14">
-        <div className="max-w-[720px]">
-          <div className="flex h-16 w-16 items-center justify-center rounded-[20px] border border-ds-border-muted bg-ds-main/55 text-accent">
-            <Bot className="h-6 w-6" strokeWidth={1.9} />
-          </div>
-
-          <h1 className="mt-6 text-[34px] font-semibold tracking-[-0.055em] text-ds-ink md:text-[48px]">
-            {t('clawEmptyHeroTitle', { name: agentName })}
-          </h1>
-          <p className="mt-3 text-[15px] leading-7 text-ds-muted md:text-[16px]">
-            {hasInboundConversation ? t('clawEmptyHeroSub') : t('clawEmptyHeroNeedsInbound')}
-          </p>
-        </div>
-      </div>
     </div>
   )
 }
@@ -1622,23 +1301,21 @@ function summarizeExecutionSection(
 
   const parts: string[] = []
   if (fileCount > 0) {
-    parts.push(
-      fileCount === 1 ? t('groupEditedFile') : t('groupEditedFiles', { count: fileCount })
-    )
+    parts.push(fileCount === 1 ? t('groupEditedFile') : t('groupEditedFilesCompact', { count: fileCount }))
   }
   if (commandCount > 0) {
     parts.push(
       commandCount === 1
         ? t('groupRanCommand')
-        : t('groupRanCommands', { count: commandCount })
+        : t('groupRanCommandsCompact', { count: commandCount })
     )
   }
   if (toolCount > 0) {
-    parts.push(toolCount === 1 ? t('groupUsedTool') : t('groupUsedTools', { count: toolCount }))
+    parts.push(toolCount === 1 ? t('groupUsedTool') : t('groupUsedToolsCompact', { count: toolCount }))
   }
   if (approvalCount > 0) {
     parts.push(
-      approvalCount === 1 ? t('groupApproval') : t('groupApprovals', { count: approvalCount })
+      approvalCount === 1 ? t('groupApproval') : t('groupApprovalsCompact', { count: approvalCount })
     )
   }
 
@@ -2073,113 +1750,6 @@ function ModelMetaTag({
   )
 }
 
-function writePromptMetaSummary(
-  display: WritePromptDisplay,
-  t: (key: string, opts?: Record<string, unknown>) => string
-): string {
-  const parts: string[] = []
-  if (display.quotes.length > 0) {
-    parts.push(t('writePromptReferencesCount', { count: display.quotes.length }))
-  }
-  if (display.context) {
-    parts.push(t('writePromptContextShort'))
-  }
-  return parts.join(' · ')
-}
-
-function WritePromptMetaDisclosure({
-  display,
-  expanded,
-  onToggle
-}: {
-  display: WritePromptDisplay
-  expanded: boolean
-  onToggle: () => void
-}): ReactElement | null {
-  const { t } = useTranslation('common')
-  const summary = writePromptMetaSummary(display, t)
-  if (!summary) return null
-
-  return (
-    <div className="mt-2 border-t border-black/5 pt-2 dark:border-white/10">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={expanded}
-        className="group flex w-full min-w-0 items-center gap-1.5 rounded-lg py-0.5 text-left text-[12px] font-medium text-ds-muted transition hover:text-ds-ink"
-      >
-        <MessageSquareQuote className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.85} />
-        <span className="min-w-0 flex-1 truncate">{summary}</span>
-        {expanded ? (
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-55" strokeWidth={1.85} />
-        ) : (
-          <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-45 transition group-hover:opacity-70" strokeWidth={1.85} />
-        )}
-      </button>
-
-      {expanded ? (
-        <div className="mt-2 flex flex-col gap-2">
-          {display.context ? (
-            <div className="rounded-xl border border-black/5 bg-white/55 px-3 py-2 text-[12px] font-normal leading-5 text-ds-muted shadow-sm dark:border-white/10 dark:bg-white/6">
-              <div className="font-medium text-ds-ink">{t('writePromptContextLabel')}</div>
-              {display.context.activeFile ? (
-                <div className="mt-1 truncate">
-                  <span className="text-ds-faint">{t('writePromptActiveFile')} </span>
-                  <span className="font-mono text-ds-muted">{display.context.activeFile}</span>
-                </div>
-              ) : null}
-              {display.context.workspaceRoot ? (
-                <div className="mt-0.5 truncate" title={display.context.workspaceRoot}>
-                  <span className="text-ds-faint">{t('writePromptWorkspace')} </span>
-                  <span className="font-mono text-ds-muted">{display.context.workspaceRoot}</span>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          {display.quotes.map((quote, index) => (
-            <WritePromptQuoteCard key={`${quote.sourceTitle}-${index}`} quote={quote} />
-          ))}
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-function WritePromptQuoteCard({ quote }: { quote: WritePromptDisplayQuote }): ReactElement {
-  const { t } = useTranslation('common')
-  const lineLabel =
-    quote.lineStart != null && quote.lineEnd != null
-      ? t('writePromptReferenceLines', { start: quote.lineStart, end: quote.lineEnd })
-      : null
-
-  return (
-    <figure className="rounded-xl border border-accent/15 bg-accent/[0.055] px-3 py-2.5 text-left shadow-sm">
-      <figcaption className="flex min-w-0 items-center gap-2 text-[12px] leading-5">
-        <MessageSquareQuote className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.9} />
-        <span className="min-w-0 flex-1 truncate font-medium text-ds-ink">
-          {quote.sourceTitle || t('writePromptReference')}
-        </span>
-        {lineLabel ? (
-          <span className="shrink-0 rounded-full bg-white/65 px-2 py-0.5 font-mono text-[11px] text-ds-faint dark:bg-white/8">
-            {lineLabel}
-          </span>
-        ) : null}
-      </figcaption>
-      <blockquote className="mt-2 max-h-36 overflow-auto border-l-2 border-accent/35 pl-3 text-[12.5px] font-normal leading-6 text-ds-muted">
-        <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-          {quote.text}
-        </div>
-      </blockquote>
-      {quote.sourceFilePath ? (
-        <div className="mt-2 truncate font-mono text-[11px] font-normal text-ds-faint" title={quote.sourceFilePath}>
-          {quote.sourceFilePath}
-        </div>
-      ) : null}
-    </figure>
-  )
-}
-
 /**
  * User message bubble with hover affordance to rewind/edit. Click the rewind
  * pill, the bubble flips into a textarea, and Resend submits an edited
@@ -2193,18 +1763,10 @@ function UserMessageBubble({
 }): ReactElement {
   const { t } = useTranslation('common')
   const busy = useChatStore((s) => s.busy)
-  const route = useChatStore((s) => s.route)
   const rewindAndResend = useChatStore((s) => s.rewindAndResend)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(block.text)
-  const [writeMetaOpen, setWriteMetaOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const parsedWritePrompt = useMemo(() => {
-    if (route !== 'write') return null
-    const parsed = parseWritePromptForDisplay(block.text)
-    return parsed?.userInput.trim() ? parsed : null
-  }, [block.text, route])
-  const displayText = parsedWritePrompt?.userInput ?? block.text
 
   useEffect(() => {
     if (!editing) return
@@ -2217,10 +1779,6 @@ function UserMessageBubble({
     el.style.height = 'auto'
     el.style.height = `${Math.min(el.scrollHeight, 360)}px`
   }, [editing])
-
-  useEffect(() => {
-    setWriteMetaOpen(false)
-  }, [block.id])
 
   const startEdit = (): void => {
     if (busy) return
@@ -2297,7 +1855,7 @@ function UserMessageBubble({
     <div className="ds-user-message group relative">
       <div className="ds-user-message-bubble min-w-0">
         <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-left">
-          {displayText}
+          {block.text}
         </div>
         {block.attachments && block.attachments.length > 0 ? (
           <div className="mt-2 flex flex-col gap-2">
@@ -2314,18 +1872,11 @@ function UserMessageBubble({
             ))}
           </div>
         ) : null}
-        {parsedWritePrompt ? (
-          <WritePromptMetaDisclosure
-            display={parsedWritePrompt}
-            expanded={writeMetaOpen}
-            onToggle={() => setWriteMetaOpen((value) => !value)}
-          />
-        ) : null}
       </div>
       <div className="mt-2 flex min-w-0 items-center justify-between gap-3 text-ds-faint opacity-90 transition group-hover:opacity-100">
         <ModelMetaTag label={block.modelLabel} className="flex-1 justify-start text-left" />
         <div className="flex items-center justify-end gap-3">
-          <CopyFeedbackButton text={displayText} iconOnly />
+          <CopyFeedbackButton text={block.text} iconOnly />
           <button
             type="button"
             onClick={startEdit}

@@ -15,9 +15,12 @@ import type {
   UserInputQuestion
 } from './types'
 import type { AppSettingsV1 } from '@shared/app-settings'
-import { unwrapClawRuntimePromptForDisplay, unwrapClawUserPromptForDisplay } from '@shared/app-settings'
 import { extractDiffFilePath } from '../lib/diff-stats'
 import { buildTurnDurationByUserId } from './thread-timing'
+
+function unwrapClawUserPromptForDisplay(text: string): string {
+  return text
+}
 
 type ThreadRecordJson = {
   id: string

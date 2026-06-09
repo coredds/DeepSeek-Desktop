@@ -4,10 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { Globe2, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import type { WorkspaceFileTarget } from '@shared/workspace-file'
-import { parseClawCommand } from '@shared/claw-commands'
-import { DEFAULT_COMPOSER_MODEL_IDS } from '@shared/default-composer-models'
 import type { AttachmentItem, ChatBlock } from '../agent/types'
-import { CLAW_COMPOSER_MODEL_IDS, useChatStore } from '../store/chat-store'
+import { useChatStore } from '../store/chat-store'
 import {
   extractLatestTurnAutoOpenDevPreviewUrls,
   extractLatestTurnDevPreviewUrls,
@@ -17,7 +15,6 @@ import {
   WORKSPACE_FILE_PREVIEW_EVENT,
   type WorkspaceFilePreviewDetail
 } from '../lib/workspace-file-preview'
-import { PURE_CHAT_WORKSPACE } from '../lib/workspace-path'
 import { Sidebar } from './chat/Sidebar'
 import { WorkbenchTopBar, type RightPanelMode } from './chat/WorkbenchTopBar'
 import { MessageTimeline } from './chat/MessageTimeline'
@@ -25,12 +22,6 @@ import { FloatingComposer } from './chat/FloatingComposer'
 import { ConnectionStatusBar } from './ConnectionStatusBar'
 import { SessionHeader } from './SessionHeader'
 import { RuntimeDiagnosticsDialog } from './RuntimeDiagnosticsDialog'
-import { WriteWorkspaceView } from './write/WriteWorkspaceView'
-import { WriteAssistantPanel } from './write/WriteAssistantPanel'
-import { WriteSidebar } from './write/WriteSidebar'
-import { composeWritePrompt } from '../write/quoted-selection'
-import { useWriteWorkspaceStore } from '../write/write-workspace-store'
-import { isWriteThreadId } from '../write/write-thread-registry'
 
 const ChangeInspector = lazy(() =>
   import('./ChangeInspector').then((module) => ({ default: module.ChangeInspector }))
@@ -239,24 +230,11 @@ export function Workbench(): ReactElement {
     runtimeErrorDetail,
     busy,
     route,
-    pluginHostRoute,
     workspaceRoot,
     runtimeConnection,
     setRoute,
-    openCode,
-    openWrite,
-    openPureChat,
-    ensureWriteThreadForWorkspace,
-    createWriteThread,
     openSettings,
     openPlugins,
-    openClaw,
-    clawChannels,
-    activeClawChannelId,
-    selectClawChannel,
-    resetClawChannelSession,
-    setClawChannelModel,
-    appendLocalClawTurn,
     setError,
     sendMessage,
     queuedMessages,
@@ -285,24 +263,11 @@ export function Workbench(): ReactElement {
       runtimeErrorDetail: s.runtimeErrorDetail,
       busy: s.busy,
       route: s.route,
-      pluginHostRoute: s.pluginHostRoute,
       workspaceRoot: s.workspaceRoot,
       runtimeConnection: s.runtimeConnection,
       setRoute: s.setRoute,
-      openCode: s.openCode,
-      openWrite: s.openWrite,
-      openPureChat: s.openPureChat,
-      ensureWriteThreadForWorkspace: s.ensureWriteThreadForWorkspace,
-      createWriteThread: s.createWriteThread,
       openSettings: s.openSettings,
       openPlugins: s.openPlugins,
-      openClaw: s.openClaw,
-      clawChannels: s.clawChannels,
-      activeClawChannelId: s.activeClawChannelId,
-      selectClawChannel: s.selectClawChannel,
-      resetClawChannelSession: s.resetClawChannelSession,
-      setClawChannelModel: s.setClawChannelModel,
-      appendLocalClawTurn: s.appendLocalClawTurn,
       setError: s.setError,
       sendMessage: s.sendMessage,
       queuedMessages: s.queuedMessages,
@@ -320,8 +285,6 @@ export function Workbench(): ReactElement {
   )
   const [input, setInput] = useState('')
   const [mode, setMode] = useState<'plan' | 'agent'>('agent')
-  const [deepThink, setDeepThink] = useState(false)
-  const [smartSearch, setSmartSearch] = useState(false)
   const [attachments, setAttachments] = useState<AttachmentItem[]>([])
   const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>(readStoredRightPanelMode)
   const [filePreviewTarget, setFilePreviewTarget] = useState<WorkspaceFileTarget | null>(null)
@@ -340,25 +303,7 @@ export function Workbench(): ReactElement {
     readStoredWidth(BOTTOM_PANEL_HEIGHT_KEY, BOTTOM_PANEL_DEFAULT)
   )
   const [runtimeDiagnosticsOpen, setRuntimeDiagnosticsOpen] = useState(false)
-  const writeAssistantOpen = useWriteWorkspaceStore((s) => s.assistantOpen)
-  const setWriteAssistantOpen = useWriteWorkspaceStore((s) => s.setAssistantOpen)
-  const writeAssistantModel = useWriteWorkspaceStore((s) => s.assistantModel)
-  const setWriteAssistantModel = useWriteWorkspaceStore((s) => s.setAssistantModel)
-  const writeAssistantPickList = useMemo(() => {
-    const ordered = new Set<string>()
-    for (const id of DEFAULT_COMPOSER_MODEL_IDS) {
-      const normalized = id.trim()
-      if (normalized) ordered.add(normalized)
-    }
-    for (const id of composerPickList) {
-      const normalized = id.trim()
-      if (normalized) ordered.add(normalized)
-    }
-    const current = writeAssistantModel.trim()
-    if (current) ordered.add(current)
-    return [...ordered]
-  }, [composerPickList, writeAssistantModel])
-  const rightPanelVisible = route === 'write' ? writeAssistantOpen : rightPanelMode !== null
+  const rightPanelVisible = rightPanelMode !== null
   const stageInsetClass = 'ds-stage-inset'
 
   const shellRef = useRef<HTMLDivElement | null>(null)
@@ -388,50 +333,11 @@ export function Workbench(): ReactElement {
     () => extractLatestTurnAutoOpenDevPreviewUrls(devPreviewBlocks),
     [devPreviewBlocks]
   )
-  const activeClawChannel = useMemo(
-    () => clawChannels.find((channel) => channel.id === activeClawChannelId) ?? null,
-    [activeClawChannelId, clawChannels]
-  )
   const latestDevPreviewUrl = detectedDevPreviewUrls[0] ?? null
   const latestAutoOpenDevPreviewUrl = autoOpenDevPreviewUrls[0] ?? null
   const showDevPreviewCard =
     route === 'chat' &&
     latestDevPreviewUrl !== null
-  const codeThreads = useMemo(
-    () => threads.filter((thread) => !isWriteThreadId(thread.id) && thread.workspace !== PURE_CHAT_WORKSPACE),
-    [threads]
-  )
-  const pureChatThreads = useMemo(
-    () => threads.filter((thread) => thread.workspace === PURE_CHAT_WORKSPACE),
-    [threads]
-  )
-
-  const mirrorClawCommand = async (userText: string, replyText: string): Promise<void> => {
-    if (!activeThreadId || typeof window.dsGui?.mirrorClawChannelMessageToFeishu !== 'function') return
-    const userResult = await window.dsGui.mirrorClawChannelMessageToFeishu(
-      activeThreadId,
-      userText,
-      'user'
-    )
-    if (!userResult.ok) return
-    await window.dsGui.mirrorClawChannelMessageToFeishu(
-      activeThreadId,
-      replyText,
-      'assistant'
-    )
-  }
-
-  const clawHelpText = (): string =>
-    [
-      t('clawHelpTitle'),
-      '',
-      `- \`/help\`: ${t('clawHelpCommandHelp')}`,
-      `- \`/new\`: ${t('clawHelpCommandNew')}`,
-      `- \`/model auto\`: ${t('clawHelpCommandModelAuto')}`,
-      `- \`/model pro\`: ${t('clawHelpCommandModelPro')}`,
-      `- \`/model flash\`: ${t('clawHelpCommandModelFlash')}`,
-      `- \`/model\`: ${t('clawHelpCommandModelShow')}`
-    ].join('\n')
 
   useEffect(() => {
     inputRef.current = input
@@ -492,16 +398,10 @@ export function Workbench(): ReactElement {
   }, [latestAutoOpenDevPreviewUrl, route])
 
   useEffect(() => {
-    if (workspaceRoot.trim() || route === 'chat-pure') return
+    if (workspaceRoot.trim()) return
     setTerminalPanelVisible(false)
     setTerminalPanelMounted(false)
   }, [workspaceRoot, route])
-
-  useEffect(() => {
-    if (route !== 'write') return
-    if (rightPanelMode !== null) setRightPanelMode(null)
-    if (terminalPanelVisible) setTerminalPanelVisible(false)
-  }, [route, rightPanelMode, terminalPanelVisible])
 
   useEffect(() => {
     const prev = prevThreadId.current
@@ -562,16 +462,13 @@ export function Workbench(): ReactElement {
     const onKey = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n') {
         e.preventDefault()
-        if (useChatStore.getState().route === 'write') {
-          void createWriteThread()
-          return
-        }
+        setRoute('chat')
         void createThread()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [createThread, createWriteThread])
+  }, [createThread, setRoute])
 
   useLayoutEffect(() => {
     const sync = (): void => {
@@ -598,153 +495,25 @@ export function Workbench(): ReactElement {
     return () => window.removeEventListener('resize', sync)
   }, [leftSidebarCollapsed, leftSidebarWidth, rightPanelVisible, rightSidebarWidth, terminalPanelHeight])
 
-  const sendWritePrompt = (value: string): void => {
-    const v = value.trim()
-    if (!v) return
-    const writeState = useWriteWorkspaceStore.getState()
-    const writeWorkspaceRoot = writeState.workspaceRoot || workspaceRoot
-    const prompt = composeWritePrompt(v, writeState.quotedSelections, {
-      workspaceRoot: writeWorkspaceRoot,
-      activeFilePath: writeState.activeFilePath
-    })
-    setInput('')
-    void (async () => {
-      const threadId = await ensureWriteThreadForWorkspace(writeWorkspaceRoot)
-      if (!threadId) {
-        setInput(v)
-        return
-      }
-      const model = writeState.assistantModel.trim()
-      const sent = await sendMessage(
-        prompt,
-        mode === 'plan' ? 'plan' : 'agent',
-        model ? { model } : undefined
-      )
-      if (sent) {
-        useWriteWorkspaceStore.getState().clearQuotedSelections()
-      }
-    })()
-  }
-
   const handleSend = (): void => {
     const v = input.trim()
     if (!v) return
-    if (route === 'write') {
-      sendWritePrompt(v)
-      return
-    }
-    if (route === 'claw') {
-      const command = parseClawCommand(v)
-      if (command?.kind === 'clear') {
-        if (!activeClawChannelId) {
-          setError(t('clawNoActiveIm'))
-          return
-        }
-        setInput('')
-        void (async () => {
-          await resetClawChannelSession(activeClawChannelId)
-          const replyText = t('clawNewSessionStarted')
-          appendLocalClawTurn(v, replyText)
-          await mirrorClawCommand(v, replyText)
-        })()
-        return
-      }
-      if (command?.kind === 'help') {
-        setInput('')
-        const replyText = clawHelpText()
-        appendLocalClawTurn(v, replyText)
-        void mirrorClawCommand(v, replyText)
-        return
-      }
-      if (command?.kind === 'model') {
-        if (!activeClawChannelId) {
-          setError(t('clawNoActiveIm'))
-          return
-        }
-        setInput('')
-        void (async () => {
-          await setClawChannelModel(activeClawChannelId, command.model)
-          const replyText = t('clawModelChanged', { model: command.model })
-          appendLocalClawTurn(v, replyText)
-          await mirrorClawCommand(v, replyText)
-        })()
-        return
-      }
-      if (command?.kind === 'showModel') {
-        if (!activeClawChannelId) {
-          setError(t('clawNoActiveIm'))
-          return
-        }
-        setInput('')
-        const replyText = t('clawModelCurrent', {
-          model: activeClawChannel?.model ?? 'auto'
-        })
-        appendLocalClawTurn(v, replyText)
-        void mirrorClawCommand(v, replyText)
-        return
-      }
-      if (command?.kind === 'invalidModel') {
-        setError(t('clawModelCommandHint'))
-        return
-      }
-      if (!activeClawChannelId) {
-        setError(t('clawNoActiveIm'))
-        return
-      }
-      setInput('')
-      void (async () => {
-        const taskResult = typeof window.dsGui?.createClawTaskFromText === 'function'
-          ? await window.dsGui.createClawTaskFromText(v, {
-              channelId: activeClawChannelId,
-              modelHint: activeClawChannel?.model,
-              mode
-            })
-          : { kind: 'noop' as const }
-        if (taskResult.kind === 'created') {
-          appendLocalClawTurn(v, taskResult.confirmationText)
-          await mirrorClawCommand(v, taskResult.confirmationText)
-          return
-        }
-        if (taskResult.kind === 'error') {
-          appendLocalClawTurn(v, `Failed to create scheduled task: ${taskResult.message}`)
-          return
-        }
-        if (!activeThreadId) {
-          await selectClawChannel(activeClawChannelId)
-          await useChatStore.getState().sendMessage(v, mode === 'plan' ? 'plan' : 'agent')
-          return
-        }
-        await sendMessage(v, mode === 'plan' ? 'plan' : 'agent')
-      })()
-      return
-    }
     setInput('')
     const currentAttachments = [...attachments]
     setAttachments([])
     void sendMessage(v, mode === 'plan' ? 'plan' : 'agent', {
-      ...(currentAttachments.length > 0 ? { attachments: currentAttachments } : {}),
-      ...(deepThink ? { deepThink: true } : {}),
-      ...(smartSearch ? { search: true } : {})
+      ...(currentAttachments.length > 0 ? { attachments: currentAttachments } : {})
     })
   }
 
   const openThread = (id: string): void => {
-    const thread = threads.find((t) => t.id === id)
-    if (thread && thread.workspace === PURE_CHAT_WORKSPACE) {
-      setRoute('chat-pure')
-    } else {
-      setRoute('chat')
-    }
+    setRoute('chat')
     void selectThread(id)
   }
 
   const startNewChat = (): void => {
-    if (route === 'chat-pure') {
-      void createThread()
-    } else {
-      setRoute('chat')
-      void createThread()
-    }
+    setRoute('chat')
+    void createThread()
   }
 
   const startNewChatInWorkspace = (workspaceRoot: string): void => {
@@ -752,14 +521,6 @@ export function Workbench(): ReactElement {
     void createThread({ workspaceRoot })
   }
 
-  const sidebarView: 'chat-pure' | 'chat' | 'write' | 'claw' =
-    route === 'claw' || (route === 'plugins' && pluginHostRoute === 'claw')
-      ? 'claw'
-      : route === 'chat-pure'
-        ? 'chat-pure'
-      : route === 'write'
-        ? 'write'
-        : 'chat'
 
   const toggleRightPanelMode = (nextMode: Exclude<RightPanelMode, null>): void => {
     setRightPanelMode((current) => (current === nextMode ? null : nextMode))
@@ -770,21 +531,10 @@ export function Workbench(): ReactElement {
   }
 
   const closeRightPanel = (): void => {
-    if (route === 'write') {
-      setWriteAssistantOpen(false)
-      return
-    }
     setRightPanelMode(null)
     setFilePreviewTarget(null)
   }
 
-  const startNewWriteAssistantConversation = (): void => {
-    const writeState = useWriteWorkspaceStore.getState()
-    const writeWorkspaceRoot = writeState.workspaceRoot || workspaceRoot
-    setInput('')
-    writeState.clearQuotedSelections()
-    void createWriteThread(writeWorkspaceRoot)
-  }
 
   const toggleLeftSidebar = (): void => {
     setLeftSidebarCollapsed((current) => !current)
@@ -843,10 +593,6 @@ export function Workbench(): ReactElement {
       </div>
     </div>
   )
-
-  const writeRuntimeBannerMessage = runtimeConnection !== 'ready'
-    ? (error?.trim() || t('writeRuntimeUnavailable'))
-    : null
 
   const beginLeftResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (leftSidebarCollapsed || event.button !== 0) return
@@ -965,33 +711,7 @@ export function Workbench(): ReactElement {
         </div>
         <div className="h-full min-h-0 shrink-0" style={{ width: rightSidebarWidth }}>
           <Suspense fallback={<div className="h-full w-full bg-ds-sidebar" />}>
-            {route === 'write' && writeAssistantOpen ? (
-              <WriteAssistantPanel
-                input={input}
-                setInput={setInput}
-                mode={mode}
-                setMode={setMode}
-                busy={busy}
-                runtimeConnection={runtimeConnection}
-                activeThreadId={activeThreadId}
-                blocks={blocks}
-                liveReasoning={liveReasoning}
-                liveAssistant={liveAssistant}
-                composerModel={writeAssistantModel}
-                composerPickList={writeAssistantPickList}
-                setComposerModel={setWriteAssistantModel}
-                queuedMessages={queuedMessages}
-                removeQueuedMessage={removeQueuedMessage}
-                onSend={handleSend}
-                onInterrupt={() => void interrupt()}
-                onRetryConnection={() => void probeRuntime('user')}
-                onOpenSettings={() => openSettings('agents')}
-                onOpenDiagnostics={() => setRuntimeDiagnosticsOpen(true)}
-                onNewConversation={startNewWriteAssistantConversation}
-                onCollapse={closeRightPanel}
-                className="h-full max-h-full w-full"
-              />
-            ) : rightPanelMode === 'changes' ? (
+            {rightPanelMode === 'changes' ? (
               <ChangeInspector
                 blocks={blocks}
                 className="h-full max-h-full w-full flex-col"
@@ -1031,21 +751,9 @@ export function Workbench(): ReactElement {
       {!leftSidebarCollapsed ? (
         <>
           <div className="min-h-0 shrink-0" style={{ width: leftSidebarWidth }}>
-            {route === 'write' ? (
-              <WriteSidebar
-                activeView={sidebarView}
-                onPureChatOpen={() => void openPureChat()}
-                onCodeOpen={() => void openCode()}
-                onWriteOpen={() => void openWrite()}
-                onClawOpen={() => openClaw()}
-                onOpenSettings={(section) => openSettings(section)}
-              />
-            ) : (
             <Sidebar
-              threads={sidebarView === 'chat-pure' ? pureChatThreads : codeThreads}
+              threads={threads}
               activeThreadId={activeThreadId}
-              activeView={sidebarView}
-              pluginsActive={route === 'plugins'}
               runtimeReady={runtimeConnection === 'ready'}
               threadSearch={threadSearch}
               showArchivedThreads={showArchivedThreads}
@@ -1058,13 +766,8 @@ export function Workbench(): ReactElement {
               onNewChat={startNewChat}
               onNewChatInWorkspace={startNewChatInWorkspace}
               onOpenSettings={(section) => openSettings(section)}
-              onOpenPlugins={() => openPlugins(sidebarView === 'claw' ? 'claw' : sidebarView === 'chat-pure' ? 'chat-pure' : 'chat')}
-              onPureChatOpen={() => void openPureChat()}
-              onCodeOpen={() => void openCode()}
-              onWriteOpen={() => void openWrite()}
-              onClawOpen={() => openClaw()}
+              onOpenPlugins={() => openPlugins()}
             />
-            )}
           </div>
           <div
             role="separator"
@@ -1103,20 +806,6 @@ export function Workbench(): ReactElement {
               <PluginMarketplaceView />
             </Suspense>
           </>
-        ) : route === 'write' ? (
-          <>
-            {writeRuntimeBannerMessage ? renderRuntimeBanner(writeRuntimeBannerMessage) : null}
-            <div className="flex min-h-0 flex-1">
-              <WriteWorkspaceView
-                leftSidebarCollapsed={leftSidebarCollapsed}
-                onToggleLeftSidebar={toggleLeftSidebar}
-                input={input}
-                setInput={setInput}
-                onSubmitPrompt={sendWritePrompt}
-              />
-              {renderRightPanel()}
-            </div>
-          </>
         ) : (
           <>
         {error && !(runtimeConnection !== 'ready' && !activeThreadId) ? renderRuntimeBanner(error) : null}
@@ -1153,7 +842,7 @@ export function Workbench(): ReactElement {
                     rightPanelMode={rightPanelMode}
                     onToggleRightPanelMode={toggleRightPanelMode}
                     terminalPanelOpen={terminalPanelVisible}
-                    terminalPanelEnabled={workspaceRoot.trim().length > 0 && route !== 'chat-pure'}
+                    terminalPanelEnabled={workspaceRoot.trim().length > 0}
                     onToggleTerminalPanel={toggleTerminalPanel}
                   />
                 </div>
@@ -1168,7 +857,6 @@ export function Workbench(): ReactElement {
               onRetryConnection={() => void probeRuntime('user')}
               onOpenSettings={() => openSettings('agents')}
               onOpenDiagnostics={() => setRuntimeDiagnosticsOpen(true)}
-              onSelectSuggestion={(text) => setInput(text)}
               devPreviewCard={
                 showDevPreviewCard ? (
                   <DevPreviewLaunchCard
@@ -1187,17 +875,9 @@ export function Workbench(): ReactElement {
                 busy={busy}
                 runtimeReady={runtimeConnection === 'ready'}
                 hasActiveThread={Boolean(activeThreadId)}
-                composerModel={
-                  route === 'claw'
-                    ? clawChannels.find((channel) => channel.id === activeClawChannelId)?.model ?? 'auto'
-                    : composerModel
-                }
-                composerPickList={route === 'claw' ? CLAW_COMPOSER_MODEL_IDS : composerPickList}
+                composerModel={composerModel}
+                composerPickList={composerPickList}
                 onComposerModelChange={(modelId) => {
-                  if (route === 'claw' && activeClawChannelId) {
-                    void setClawChannelModel(activeClawChannelId, modelId)
-                    return
-                  }
                   setComposerModel(modelId)
                 }}
                 attachments={attachments}
@@ -1207,10 +887,6 @@ export function Workbench(): ReactElement {
                 onRemoveQueuedMessage={removeQueuedMessage}
                 onInterrupt={() => void interrupt()}
                 onOpenRuntimePanel={openRuntimePanel}
-                deepThink={deepThink}
-                setDeepThink={setDeepThink}
-                smartSearch={smartSearch}
-                setSmartSearch={setSmartSearch}
               />
             </div>
           </section>
