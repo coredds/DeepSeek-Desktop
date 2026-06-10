@@ -12,6 +12,7 @@ import {
   Paperclip,
   RotateCcw,
   Send,
+  ShieldCheck,
   Square,
   X
 } from 'lucide-react'
@@ -26,6 +27,12 @@ import {
 } from '../../hooks/use-thread-usage'
 import { GitBranchPicker } from './GitBranchPicker'
 import type { AttachmentItem } from '../../agent/types'
+import type { ApprovalPolicy, SandboxMode } from '@shared/app-settings'
+
+type ExecutionSettings = {
+  approval: ApprovalPolicy
+  sandbox: SandboxMode
+}
 
 type QueuedComposerMessage = {
   id: string
@@ -129,6 +136,26 @@ export function FloatingComposer({
   )
   const threadUsage = threadUsageState.usage
   const effectiveWorkspaceRoot = normalizeWorkspaceRoot(activeThreadWorkspace || workspaceRootOverride || workspaceRoot)
+  const [execSettings, setExecSettings] = useState<ExecutionSettings>({ approval: 'on-request', sandbox: 'workspace-write' })
+
+  useEffect(() => {
+    if (typeof window.dsGui?.getSettings !== 'function') return
+    window.dsGui.getSettings().then((s) => {
+      setExecSettings({ approval: s.deepseek.approvalPolicy, sandbox: s.deepseek.sandboxMode })
+    }).catch(() => {})
+  }, [])
+
+  const updateExecSetting = useCallback(
+    (key: 'approval' | 'sandbox', value: ApprovalPolicy | SandboxMode) => {
+      setExecSettings((prev) => ({ ...prev, [key]: value }))
+      if (typeof window.dsGui?.setSettings === 'function') {
+        window.dsGui.setSettings({
+          deepseek: { [key]: value }
+        } as Parameters<typeof window.dsGui.setSettings>[0]).catch(() => {})
+      }
+    },
+    []
+  )
 
   const canCompose = runtimeReady
   const canChangeModel = canCompose && !busy
@@ -831,6 +858,37 @@ export function FloatingComposer({
         <div className="ds-composer-footer mt-2 flex min-h-8 flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4">
           <div className="ds-composer-footer-left flex min-w-0 flex-1 flex-wrap items-center gap-2">
             <GitBranchPicker workspaceRoot={effectiveWorkspaceRoot} />
+
+            <div className="ds-no-drag inline-flex h-8 items-center gap-1 rounded-lg border border-ds-border-muted bg-ds-card/72 px-2 shadow-sm">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-ds-faint" strokeWidth={1.7} />
+              <select
+                value={execSettings.approval}
+                onChange={(e) => updateExecSetting('approval', e.target.value as ApprovalPolicy)}
+                className="h-full appearance-none bg-transparent pr-1 text-[12.5px] font-medium text-ds-muted outline-none hover:text-ds-ink"
+                title={t('composerApprovalShort')}
+              >
+                <option value="auto">{t('approvalAutoShort')}</option>
+                <option value="on-request">{t('approvalOnRequestShort')}</option>
+                <option value="untrusted">{t('approvalUntrustedShort')}</option>
+                <option value="suggest">{t('approvalSuggestShort')}</option>
+                <option value="never">{t('approvalNeverShort')}</option>
+              </select>
+            </div>
+
+            <div className="ds-no-drag inline-flex h-8 items-center gap-0.5 rounded-lg border border-ds-border-muted bg-ds-card/72 px-2 shadow-sm">
+              <select
+                value={execSettings.sandbox}
+                onChange={(e) => updateExecSetting('sandbox', e.target.value as SandboxMode)}
+                className="h-full appearance-none bg-transparent pr-1 text-[12.5px] font-medium text-ds-muted outline-none hover:text-ds-ink"
+                title={t('composerAccessShort')}
+              >
+                <option value="workspace-write">{t('sandboxWorkspaceWriteShort')}</option>
+                <option value="read-only">{t('sandboxReadOnlyShort')}</option>
+                <option value="danger-full-access">{t('sandboxFullAccessShort')}</option>
+                <option value="external-sandbox">{t('sandboxExternalShort')}</option>
+              </select>
+            </div>
+
             {showThreadUsageFooter ? (
               <div
                 className="ds-composer-usage ds-no-drag inline-flex h-8 max-w-full min-w-0 items-center gap-2 overflow-hidden rounded-lg border border-ds-border-muted bg-ds-card/72 px-2.5 text-[12.5px] font-medium text-ds-muted shadow-sm"
