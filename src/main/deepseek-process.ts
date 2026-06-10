@@ -5,6 +5,13 @@ import { resolveDeepseekExecutable } from './resolve-deepseek-binary'
 
 let child: ChildProcess | null = null
 let lastResolvedBinary: string | null = null
+let combinedOutput = ''
+
+const MAX_OUTPUT_BUFFER = 50_000
+
+export function getRuntimeOutput(): string {
+  return combinedOutput
+}
 
 type PortOwner = {
   pid: number
@@ -97,6 +104,7 @@ export function stopDeepseekChild(): void {
     child.kill('SIGTERM')
   }
   child = null
+  combinedOutput = ''
 }
 
 export async function stopDeepseekChildAndWait(timeoutMs = 5_000): Promise<void> {
@@ -123,6 +131,7 @@ export async function stopDeepseekChildAndWait(timeoutMs = 5_000): Promise<void>
     proc.once('error', finish)
     proc.kill('SIGTERM')
   })
+  combinedOutput = ''
 }
 
 export async function inspectDeepseekLaunchConfig(
@@ -272,17 +281,26 @@ export async function startDeepseekChild(settings: AppSettingsV1): Promise<void>
   let stdout = ''
   let stderr = ''
   const appendOutput = (current: string, chunk: unknown): string =>
-    `${current}${String(chunk)}`.slice(-8_000)
+    `${current}${String(chunk)}`.slice(-MAX_OUTPUT_BUFFER)
+  const appendCombined = (chunk: unknown): void => {
+    const text = String(chunk)
+    combinedOutput = `${combinedOutput}${text}`.slice(-MAX_OUTPUT_BUFFER * 2)
+  }
   proc.stdout?.on('data', (d) => {
     stdout = appendOutput(stdout, d)
+    appendCombined(d)
     process.stdout.write(`[deepseek] ${d}`)
   })
   proc.stderr?.on('data', (d) => {
     stderr = appendOutput(stderr, d)
+    appendCombined(d)
     process.stderr.write(`[deepseek] ${d}`)
   })
   proc.on('exit', () => {
-    if (child === proc) child = null
+    if (child === proc) {
+      child = null
+      combinedOutput = ''
+    }
   })
   await new Promise<void>((resolve, reject) => {
     const cleanup = (): void => {

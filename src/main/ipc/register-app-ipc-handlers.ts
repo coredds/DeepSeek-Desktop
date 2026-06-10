@@ -9,6 +9,9 @@ import type { DeepseekUpdateInfo, DeepseekUpdateInstallResult } from '../../shar
 import type {
   DeepseekRuntimeDiagnosticIssue,
   DeepseekRuntimeDiagnosticsResult,
+  McpEnvDeleteResult,
+  McpEnvListResult,
+  McpEnvSetResult,
   RuntimeRequestResult,
   SystemNotificationResult,
   TurnCompleteNotificationPayload,
@@ -20,6 +23,9 @@ import {
   defaultPathSchema,
   gitBranchPayloadSchema,
   logErrorPayloadSchema,
+  mcpEnvDeletePayloadSchema,
+  mcpEnvSetPayloadSchema,
+  mcpServerIdSchema,
   notificationPayloadSchema,
   openEditorPathPayloadSchema,
   rootPathSchema,
@@ -46,7 +52,7 @@ import {
 } from './app-ipc-schemas'
 import type { JsonSettingsStore } from '../settings-store'
 import { getRuntimeBaseUrl } from '../settings-store'
-import { findListeningProcessOnPort } from '../deepseek-process'
+import { findListeningProcessOnPort, getRuntimeOutput } from '../deepseek-process'
 import { createAndSwitchGitBranch, getGitBranches, switchGitBranch } from '../services/git-service'
 import { getWorkspaceHealth } from '../services/workspace-health-service'
 import {
@@ -277,6 +283,193 @@ async function diagnoseDeepseekRuntime(
     },
     issues
   }
+}
+
+const LOOKAHEAD_NEXT_SECTION = '(?=\\r?\\n\\[|\\r?\\n*$)'
+
+function parseTomlEnvBlock(config: string, serverId: string): string | null {
+  const escaped = serverId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const pattern = new RegExp(
+    `\\[mcp_servers\\."${escaped}"\\][\\s\\S]*?${LOOKAHEAD_NEXT_SECTION}`,
+    'i'
+  )
+  const match = config.match(pattern)
+  return match ? match[0] : null
+}
+
+function parseTomlInlineEnv(line: string): Array<{ key: string; value: string }> {
+  const results: Array<{ key: string; value: string }> = []
+  const entryRe = /([A-Za-z_]\w*)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|([^,\s}]+))/g
+  let m: RegExpExecArray | null
+  while ((m = entryRe.exec(line)) !== null) {
+    const raw = m[2] ?? m[3] ?? m[4] ?? ''
+    const value = m[2] !== undefined
+      ? raw.replace(/\\(.)/g, '$1')
+      : raw
+    results.push({ key: m[1], value })
+  }
+  return results
+}
+
+function tomlBasicString(value: string): string {
+  let result = ''
+  for (let i = 0; i < value.length; i += 1) {
+    const c = value[i]
+    if (c === '\\') result += '\\\\'
+    else if (c === '"') result += '\\"'
+    else if (c === '\n') result += '\\n'
+    else if (c === '\r') result += '\\r'
+    else if (c === '\t') result += '\\t'
+    else result += c
+  }
+  return result
+}
+
+function serializeTomlEnv(vars: Array<{ key: string; value: string }>): string {
+  if (vars.length === 0) return ''
+  const entries = vars.map((v) => `${v.key} = "${tomlBasicString(v.value)}"`)
+  return `env = { ${entries.join(', ')} }`
+}
+
+async function listMcpEnvVars(
+  configPath: string,
+  serverIdFilter?: string
+): Promise<McpEnvListResult> {
+  let content = ''
+  try {
+    content = await readFile(configPath, 'utf8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { servers: [] }
+    throw error
+  }
+
+  const blockRe = /\[mcp_servers\."([^"]+)"\]\s*\r?\n?([\s\S]*?)(?=\r?\n\[|\r?\n*$)/g
+  const servers: McpEnvListResult['servers'] = []
+  let blockMatch: RegExpExecArray | null
+  while ((blockMatch = blockRe.exec(content)) !== null) {
+    const id = blockMatch[1]
+    if (serverIdFilter && id !== serverIdFilter) continue
+    const blockBody = blockMatch[2]
+
+    const commandMatch = blockBody.match(/command\s*=\s*"([^"]*)"/)
+    const command = commandMatch ? commandMatch[1] : undefined
+
+    const envVars: Array<{ key: string; value: string }> = []
+    const envRe = /env\s*=\s*\{([^}]+)\}/g
+    let envMatch: RegExpExecArray | null
+    while ((envMatch = envRe.exec(blockBody)) !== null) {
+      const parsed = parseTomlInlineEnv(envMatch[1])
+      for (const entry of parsed) {
+        envVars.push(entry)
+      }
+    }
+
+    servers.push({ id, command, envVars })
+  }
+
+  return { servers }
+}
+
+async function setMcpEnvVar(
+  configPath: string,
+  serverId: string,
+  key: string,
+  value: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  let content = ''
+  try {
+    content = await readFile(configPath, 'utf8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { ok: false, message: 'Config file not found.' }
+    }
+    throw error
+  }
+
+  const block = parseTomlEnvBlock(content, serverId)
+  if (!block) {
+    return { ok: false, message: `MCP server "${serverId}" not found in config.` }
+  }
+
+  const envRe = /env\s*=\s*\{([^}]+)\}/g
+  let envMatch = envRe.exec(block)
+  let existingVars: Array<{ key: string; value: string }> = []
+  if (envMatch) {
+    existingVars = parseTomlInlineEnv(envMatch[1])
+    const filtered = existingVars.filter((v) => v.key !== key)
+    filtered.push({ key, value })
+    existingVars = filtered
+  } else {
+    existingVars = [{ key, value }]
+  }
+
+  const escapedId = serverId.replace(/[.*+^?${}()|[\]\\]/g, '\\$&')
+  const blockRe = new RegExp(
+    `(\\[mcp_servers\\."${escapedId}"\\][\\s\\S]*?)${LOOKAHEAD_NEXT_SECTION}`,
+    'i'
+  )
+
+  let newBlock = block
+  if (envMatch) {
+    newBlock = block.replace(envRe, serializeTomlEnv(existingVars))
+  } else {
+    const tableLineRe = /(\[mcp_servers\."([^"]+)"\]\s*\r?\n?)/i
+    const envLine = serializeTomlEnv(existingVars)
+    newBlock = block.replace(tableLineRe, `$1${envLine}\n`)
+  }
+
+  const updated = content.replace(blockRe, newBlock)
+  await mkdir(dirname(configPath), { recursive: true })
+  await writeFile(configPath, updated, 'utf8')
+  return { ok: true }
+}
+
+async function deleteMcpEnvVar(
+  configPath: string,
+  serverId: string,
+  key: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  let content = ''
+  try {
+    content = await readFile(configPath, 'utf8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { ok: false, message: 'Config file not found.' }
+    }
+    throw error
+  }
+
+  const block = parseTomlEnvBlock(content, serverId)
+  if (!block) {
+    return { ok: false, message: `MCP server "${serverId}" not found in config.` }
+  }
+
+  const envRe = /env\s*=\s*\{([^}]+)\}/g
+  let envMatch = envRe.exec(block)
+  if (!envMatch) {
+    return { ok: true }
+  }
+
+  let existingVars = parseTomlInlineEnv(envMatch[1])
+  existingVars = existingVars.filter((v) => v.key !== key)
+
+  const escapedId = serverId.replace(/[.*+^?${}()|[\]\\]/g, '\\$&')
+  const blockRe = new RegExp(
+    `(\\[mcp_servers\\."${escapedId}"\\][\\s\\S]*?)${LOOKAHEAD_NEXT_SECTION}`,
+    'i'
+  )
+
+  let newBlock: string
+  if (existingVars.length === 0) {
+    newBlock = block.replace(/\s*env\s*=\s*\{[^}]*\}\s*\r?\n?/g, '\n')
+  } else {
+    newBlock = block.replace(envRe, serializeTomlEnv(existingVars))
+  }
+
+  const updated = content.replace(blockRe, newBlock)
+  await mkdir(dirname(configPath), { recursive: true })
+  await writeFile(configPath, updated, 'utf8')
+  return { ok: true }
 }
 
 export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): void {
@@ -523,6 +716,37 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('deepseek:diagnostics', async () =>
     diagnoseDeepseekRuntime({ store, prepareDeepseekBinary, resolveDeepseekConfigPath })
   )
+
+  ipcMain.handle('mcp:runtime-output', async () => {
+    return { output: getRuntimeOutput() }
+  })
+
+  ipcMain.handle('mcp:env:list', async (_, serverId: unknown) => {
+    const filter = parseIpcPayload('mcp:env:list', mcpServerIdSchema.optional(), serverId)
+    return listMcpEnvVars(resolveDeepseekConfigPath(), filter)
+  })
+
+  ipcMain.handle('mcp:env:set', async (_, payload: unknown) => {
+    const req = parseIpcPayload('mcp:env:set', mcpEnvSetPayloadSchema, payload)
+    const result = await setMcpEnvVar(resolveDeepseekConfigPath(), req.serverId, req.key, req.value)
+    if (result.ok) {
+      void restartRuntime().catch((e: unknown) => {
+        logError('mcp-env-restart', 'Runtime restart after MCP env var set failed', e)
+      })
+    }
+    return result
+  })
+
+  ipcMain.handle('mcp:env:delete', async (_, payload: unknown) => {
+    const req = parseIpcPayload('mcp:env:delete', mcpEnvDeletePayloadSchema, payload)
+    const result = await deleteMcpEnvVar(resolveDeepseekConfigPath(), req.serverId, req.key)
+    if (result.ok) {
+      void restartRuntime().catch((e: unknown) => {
+        logError('mcp-env-restart', 'Runtime restart after MCP env var delete failed', e)
+      })
+    }
+    return result
+  })
 
   ipcMain.handle('git:branches', async (_, workspaceRoot: unknown) =>
     getGitBranches(parseIpcPayload('git:branches', workspaceRootSchema, workspaceRoot))

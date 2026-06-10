@@ -107,6 +107,18 @@ export type DeepseekSpawnResult = {
   error?: string
   message?: string
 }
+export type McpRuntimeOutputResult = { output: string }
+export type McpEnvVarEntry = { key: string; value: string }
+export type McpEnvListResult = {
+  servers: Array<{
+    id: string
+    command?: string
+    envVars: McpEnvVarEntry[]
+  }>
+}
+export type McpEnvSetResult = { ok: true } | { ok: false; message: string }
+export type McpEnvDeleteResult = { ok: true } | { ok: false; message: string }
+
 export type SseEventPayload = { streamId: string; data: unknown }
 export type SseEndPayload = { streamId: string }
 export type SseErrorPayload = { streamId: string; status?: number; message?: string }
@@ -132,6 +144,10 @@ export type DsGuiApi = {
   setDeepseekConfigFile: (content: string) => Promise<DeepseekConfigSaveResult>
   openDeepseekConfigDir: () => Promise<PathOpenResult>
   diagnoseDeepseekRuntime: () => Promise<DeepseekRuntimeDiagnosticsResult>
+  getMcpRuntimeOutput: () => Promise<McpRuntimeOutputResult>
+  listMcpEnvVars: (serverId?: string) => Promise<McpEnvListResult>
+  setMcpEnvVar: (serverId: string, key: string, value: string) => Promise<McpEnvSetResult>
+  deleteMcpEnvVar: (serverId: string, key: string) => Promise<McpEnvDeleteResult>
   getGitBranches: (workspaceRoot: string) => Promise<GitBranchesResult>
   getWorkspaceHealth: (workspaceRoot: string) => Promise<WorkspaceHealthResult>
   switchGitBranch: (workspaceRoot: string, branch: string) => Promise<GitBranchesResult>

@@ -4,13 +4,16 @@ import { useTranslation } from 'react-i18next'
 import {
   Check,
   ChevronDown,
+  FileText,
   FolderOpen,
+  Key,
   Loader2,
   Plus,
   Power,
   PowerOff,
   RefreshCw,
   Search,
+  Server,
   Settings
 } from 'lucide-react'
 import {
@@ -21,6 +24,9 @@ import {
 } from '../lib/skill-root-preference'
 import { normalizeWorkspaceRoot } from '../lib/workspace-path'
 import { useChatStore } from '../store/chat-store'
+import { McpStatusDashboard } from './McpStatusDashboard'
+import { McpLogViewer } from './McpLogViewer'
+import { McpEnvManager } from './McpEnvManager'
 
 type PluginKind = 'mcp' | 'skill'
 type PluginFilter = 'all' | 'recommended' | 'installed'
@@ -343,6 +349,7 @@ export function PluginMarketplaceView(): ReactElement {
   const [skillRootId, setSkillRootId] = useState<SkillRootId>(() => loadPreferredSkillRootId())
   const [mcpConfigText, setMcpConfigText] = useState('')
   const [mcpLoaded, setMcpLoaded] = useState(false)
+  const [expandedPanel, setExpandedPanel] = useState<{ itemKey: string; panel: 'status' | 'log' | 'env' } | null>(null)
 
   const skillRootOptions = useMemo<SkillRootOption[]>(() => {
     const hasWorkspace = !!workspaceRoot
@@ -408,6 +415,7 @@ export function PluginMarketplaceView(): ReactElement {
   useEffect(() => {
     setNotice(null)
     setCustomOpen(false)
+    setExpandedPanel(null)
   }, [activeKind])
 
   const markInstalled = (key: string): void => {
@@ -481,6 +489,31 @@ export function PluginMarketplaceView(): ReactElement {
 
   const recommendedItems = visibleItems.filter((item) => !isInstalled(item))
   const personalItems = visibleItems.filter(isInstalled)
+
+  const installedMcpIds = useMemo(
+    () =>
+      RECOMMENDED_ITEMS.filter(
+        (item) => item.kind === 'mcp' && isInstalled(item)
+      ).map((item) => item.id),
+    [isInstalled]
+  )
+
+  const installedMcpNames = useMemo(
+    () =>
+      RECOMMENDED_ITEMS.filter(
+        (item) => item.kind === 'mcp' && isInstalled(item)
+      ).map((item) => t(item.titleKey)),
+    [isInstalled, t]
+  )
+
+  const togglePanel = useCallback(
+    (itemKey: string, panel: 'status' | 'log' | 'env') => {
+      setExpandedPanel((prev) =>
+        prev?.itemKey === itemKey && prev?.panel === panel ? null : { itemKey, panel }
+      )
+    },
+    []
+  )
 
   const showSplit = filter === 'all'
   const hasAnyInstalled = personalItems.length > 0
@@ -733,6 +766,8 @@ export function PluginMarketplaceView(): ReactElement {
               onAdd={addItem}
               onToggle={activeKind === 'mcp' ? toggleMcpServer : undefined}
               isDisabled={activeKind === 'mcp' ? isMcpDisabled : undefined}
+              expandedPanel={activeKind === 'mcp' ? expandedPanel : undefined}
+              onPanelToggle={activeKind === 'mcp' ? togglePanel : undefined}
               t={t}
             />
             {hasAnyInstalled ? (
@@ -745,6 +780,8 @@ export function PluginMarketplaceView(): ReactElement {
                 onAdd={addItem}
                 onToggle={activeKind === 'mcp' ? toggleMcpServer : undefined}
                 isDisabled={activeKind === 'mcp' ? isMcpDisabled : undefined}
+                expandedPanel={activeKind === 'mcp' ? expandedPanel : undefined}
+                onPanelToggle={activeKind === 'mcp' ? togglePanel : undefined}
                 t={t}
               />
             ) : null}
@@ -759,9 +796,36 @@ export function PluginMarketplaceView(): ReactElement {
             onAdd={addItem}
             onToggle={activeKind === 'mcp' ? toggleMcpServer : undefined}
             isDisabled={activeKind === 'mcp' ? isMcpDisabled : undefined}
+            expandedPanel={activeKind === 'mcp' ? expandedPanel : undefined}
+            onPanelToggle={activeKind === 'mcp' ? togglePanel : undefined}
             t={t}
           />
         )}
+
+        {expandedPanel ? (
+          <div className="mt-6">
+            {expandedPanel.panel === 'status' ? (
+              <McpStatusDashboard
+                installedIds={installedMcpIds}
+                onClose={() => setExpandedPanel(null)}
+              />
+            ) : expandedPanel.panel === 'log' ? (
+              <McpLogViewer
+                serverNames={installedMcpNames}
+                onClose={() => setExpandedPanel(null)}
+              />
+            ) : expandedPanel.panel === 'env' ? (
+              <McpEnvManager
+                serverId={expandedPanel.itemKey.replace('mcp:', '')}
+                serverLabel={installedMcpNames[installedMcpIds.indexOf(expandedPanel.itemKey.replace('mcp:', ''))] ?? expandedPanel.itemKey}
+                onClose={() => setExpandedPanel(null)}
+                onUpdated={() => {
+                  readMcpConfig().catch(() => {})
+                }}
+              />
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   )
@@ -796,6 +860,8 @@ function TabButton({
   )
 }
 
+type PanelType = 'status' | 'log' | 'env'
+
 function PluginSection({
   title,
   emptyText,
@@ -805,6 +871,8 @@ function PluginSection({
   onAdd,
   onToggle,
   isDisabled,
+  expandedPanel,
+  onPanelToggle,
   t
 }: {
   title: string
@@ -815,6 +883,8 @@ function PluginSection({
   onAdd: (item: MarketplaceItem) => Promise<void>
   onToggle?: (id: string) => Promise<void>
   isDisabled?: (id: string) => boolean
+  expandedPanel?: { itemKey: string; panel: PanelType } | null
+  onPanelToggle?: (itemKey: string, panel: PanelType) => void
   t: (key: string, values?: Record<string, unknown>) => string
 }): ReactElement {
   return (
@@ -892,6 +962,46 @@ function PluginSection({
                         <Power className="h-3.5 w-3.5" strokeWidth={2} />
                       )}
                     </button>
+                ) : null}
+                {installed && item.kind === 'mcp' && onPanelToggle ? (
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => onPanelToggle(itemKey, 'status')}
+                      title={t('pluginMcpViewStatus')}
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
+                        expandedPanel?.itemKey === itemKey && expandedPanel?.panel === 'status'
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                          : 'text-ds-faint hover:bg-ds-hover hover:text-ds-ink'
+                      }`}
+                    >
+                      <Server className="h-3.5 w-3.5" strokeWidth={2} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onPanelToggle(itemKey, 'log')}
+                      title={t('pluginMcpViewLog')}
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
+                        expandedPanel?.itemKey === itemKey && expandedPanel?.panel === 'log'
+                          ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                          : 'text-ds-faint hover:bg-ds-hover hover:text-ds-ink'
+                      }`}
+                    >
+                      <FileText className="h-3.5 w-3.5" strokeWidth={2} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onPanelToggle(itemKey, 'env')}
+                      title={t('pluginMcpViewEnv')}
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
+                        expandedPanel?.itemKey === itemKey && expandedPanel?.panel === 'env'
+                          ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
+                          : 'text-ds-faint hover:bg-ds-hover hover:text-ds-ink'
+                      }`}
+                    >
+                      <Key className="h-3.5 w-3.5" strokeWidth={2} />
+                    </button>
+                  </div>
                 ) : null}
               </div>
             )

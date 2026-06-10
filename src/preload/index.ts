@@ -32,6 +32,14 @@ const api = {
     ipcRenderer.invoke('deepseek:config:open-dir'),
   diagnoseDeepseekRuntime: () =>
     ipcRenderer.invoke('deepseek:diagnostics'),
+  getMcpRuntimeOutput: () =>
+    ipcRenderer.invoke('mcp:runtime-output'),
+  listMcpEnvVars: (serverId) =>
+    ipcRenderer.invoke('mcp:env:list', serverId),
+  setMcpEnvVar: (serverId, key, value) =>
+    ipcRenderer.invoke('mcp:env:set', { serverId, key, value }),
+  deleteMcpEnvVar: (serverId, key) =>
+    ipcRenderer.invoke('mcp:env:delete', { serverId, key }),
   getGitBranches: (workspaceRoot) =>
     ipcRenderer.invoke('git:branches', workspaceRoot),
   switchGitBranch: (workspaceRoot, branch) =>

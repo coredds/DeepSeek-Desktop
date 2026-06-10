@@ -208,6 +208,27 @@ export const exportMarkdownPayloadSchema = z
   })
   .strict()
 
+const MAX_ENV_VAR_KEY_LENGTH = 256
+const MAX_ENV_VAR_VALUE_LENGTH = 4_096
+const MCP_SERVER_ID_MAX = 128
+
+export const mcpServerIdSchema = trimmedString(MCP_SERVER_ID_MAX)
+
+export const mcpEnvSetPayloadSchema = z
+  .object({
+    serverId: mcpServerIdSchema,
+    key: trimmedString(MAX_ENV_VAR_KEY_LENGTH),
+    value: z.string().max(MAX_ENV_VAR_VALUE_LENGTH)
+  })
+  .strict()
+
+export const mcpEnvDeletePayloadSchema = z
+  .object({
+    serverId: mcpServerIdSchema,
+    key: trimmedString(MAX_ENV_VAR_KEY_LENGTH)
+  })
+  .strict()
+
 export const describeImagesPayloadSchema = z
   .object({
     images: z
